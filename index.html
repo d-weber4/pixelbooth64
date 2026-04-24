@@ -70,7 +70,7 @@ body::before{content:'';position:fixed;inset:0;background:var(--scanlines);point
 .cam-header{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:linear-gradient(to bottom,rgba(0,0,0,.85),transparent);z-index:10}
 .cam-mode-lbl{font-family:var(--font-title);font-size:.56rem;color:var(--accent1);text-shadow:var(--glow)}
 .cam-progress{font-family:var(--font-title);font-size:.5rem;color:var(--accent2)}
-#video-preview{width:100%;height:100%;object-fit:cover;display:block;transform:scaleX(-1)}
+#video-preview{width:100%;height:100%;object-fit:contain;display:block;transform:scaleX(-1)}
 .countdown-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.4);z-index:20;pointer-events:none;opacity:0;transition:opacity .2s}
 .countdown-overlay.visible{opacity:1}
 .countdown-number{font-family:var(--font-title);font-size:clamp(5rem,22vw,9rem);color:var(--accent1);text-shadow:0 0 30px var(--accent1),0 0 60px var(--accent2);animation:countPop .4s ease-out}
@@ -186,7 +186,6 @@ body::before{content:'';position:fixed;inset:0;background:var(--scanlines);point
     <button class="theme-btn" onclick="setTheme('diner',this)" title="Retro Diner">🍔</button>
     <button class="theme-btn" onclick="setTheme('winter',this)" title="Winter">❄️</button>
   </div>
-  <button class="btn btn-secondary btn-sm" onclick="showScreen('screen-setup')">⚙ FIREBASE SETUP</button>
 </div>
 
 <!-- CAMERA -->
@@ -332,40 +331,6 @@ body::before{content:'';position:fixed;inset:0;background:var(--scanlines);point
   </div>
 </div>
 
-<!-- SETUP -->
-<div class="screen" id="screen-setup">
-  <div class="setup-title">⚙ FIREBASE SETUP</div>
-  <p style="font-family:var(--font-body);font-size:1.05rem;color:var(--text2);text-align:center;max-width:560px">One-time setup (~10-15 min). All you need is a free Google account.</p>
-  <div class="setup-step">
-    <div class="step-num">STEP 1 — CREATE A FIREBASE PROJECT</div>
-    <div class="step-text">Go to <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a> and sign in. Click <b>"Add project"</b>, name it anything (e.g. "PixelBooth"), click through and hit <b>"Create project"</b>.</div>
-  </div>
-  <div class="setup-step">
-    <div class="step-num">STEP 2 — ADD A WEB APP</div>
-    <div class="step-text">Inside your project, click the <b>&lt;/&gt;</b> (Web) icon. Give it a nickname and click <b>"Register app"</b>. You'll see a config block — copy the values into the fields below.</div>
-  </div>
-  <div class="setup-step">
-    <div class="step-num">STEP 3 — ENABLE STORAGE</div>
-    <div class="step-text">Left sidebar: <b>Build → Storage → Get started</b>. Choose your region → Next → Done. Click the <b>Rules</b> tab and replace everything with:<br><br>
-      <code style="background:#000;padding:4px 8px;border-radius:3px;font-size:.9rem">allow read, write: if true;</code><br><br>Click <b>Publish</b>.</div>
-  </div>
-  <div class="setup-step">
-    <div class="step-num">STEP 4 — PASTE YOUR CONFIG</div>
-    <div class="config-inputs">
-      <input class="config-input" id="cfg-apiKey" placeholder="apiKey" autocomplete="off" spellcheck="false">
-      <input class="config-input" id="cfg-authDomain" placeholder="authDomain" autocomplete="off" spellcheck="false">
-      <input class="config-input" id="cfg-projectId" placeholder="projectId" autocomplete="off" spellcheck="false">
-      <input class="config-input" id="cfg-storageBucket" placeholder="storageBucket" autocomplete="off" spellcheck="false">
-      <input class="config-input" id="cfg-messagingSenderId" placeholder="messagingSenderId" autocomplete="off" spellcheck="false">
-      <input class="config-input" id="cfg-appId" placeholder="appId" autocomplete="off" spellcheck="false">
-    </div>
-  </div>
-  <div class="setup-actions">
-    <button class="btn" onclick="saveFirebaseConfig()">💾 SAVE CONFIG</button>
-    <button class="btn btn-secondary" onclick="showScreen('screen-home')">← BACK</button>
-  </div>
-</div>
-
 <!-- MODAL -->
 <div class="modal-overlay" id="modal">
   <div class="modal-box">
@@ -450,20 +415,22 @@ window.addEventListener('load', () => { loadFirebaseConfig(); initPixelBg(); res
 // FIREBASE
 // ════════════════════════════════════════════════════
 function loadFirebaseConfig() {
-  const s = localStorage.getItem('pixelbooth_firebase'); if(!s) return;
-  try { firebaseConfig=JSON.parse(s); Object.keys(firebaseConfig).forEach(k=>{const el=document.getElementById('cfg-'+k);if(el)el.value=firebaseConfig[k];}); initFirebase(); } catch(e){}
-}
-function saveFirebaseConfig() {
-  const cfg={apiKey:v('cfg-apiKey'),authDomain:v('cfg-authDomain'),projectId:v('cfg-projectId'),storageBucket:v('cfg-storageBucket'),messagingSenderId:v('cfg-messagingSenderId'),appId:v('cfg-appId')};
-  if(!cfg.apiKey||!cfg.projectId||!cfg.storageBucket){showToast('Fill in apiKey, projectId, storageBucket');return;}
-  localStorage.setItem('pixelbooth_firebase',JSON.stringify(cfg)); firebaseConfig=cfg; initFirebase(); showToast('✅ Firebase config saved!'); showScreen('screen-home');
+  firebaseConfig = {
+    apiKey: "AIzaSyBkx3Iwof85fEY45eLLdIzrbBs9tuAhr10",
+    authDomain: "photobooth64-11d1c.firebaseapp.com",
+    projectId: "photobooth64-11d1c",
+    storageBucket: "photobooth64-11d1c.firebasestorage.app",
+    messagingSenderId: "123245203678",
+    appId: "1:123245203678:web:34ba21d618a9193f0f724f"
+  };
+  initFirebase();
 }
 function initFirebase() {
   if(!firebaseConfig) return;
   try { const{initializeApp,getStorage}=window._firebaseModules; try{firebaseApp=initializeApp(firebaseConfig,'pixelbooth');}catch(e){} firebaseStorage=getStorage(firebaseApp); } catch(e){console.warn('Firebase:',e.message);}
 }
 async function uploadToFirebase(blob, mode) {
-  if(!firebaseStorage) throw new Error('Firebase not configured. Go to ⚙ Setup first.');
+  if(!firebaseStorage) throw new Error('Firebase storage not initialized. Check your configuration.');
   const{ref,uploadBytes,getDownloadURL}=window._firebaseModules;
   const today=new Date().toISOString().slice(0,10), ts=Date.now();
   const ext=blob.type.includes('mp4')?'mp4':blob.type.includes('webm')?'webm':'jpg';
@@ -897,7 +864,6 @@ function stopCamera(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=
 function cleanupCapture(){if(rawVideoURL)URL.revokeObjectURL(rawVideoURL);capturedBlob=null;capturedDataURL=null;rawVideoURL=null;filmstripPhotos=[];activeStickers.forEach(s=>s.remove());activeStickers=[];stopCamera();}
 function dataURLToBlob(dataURL){const arr=dataURL.split(','),mime=arr[0].match(/:(.*?);/)[1];const b=atob(arr[1]);let n=b.length;const u=new Uint8Array(n);while(n--)u[n]=b.charCodeAt(n);return new Blob([u],{type:mime});}
 function delay(ms){return new Promise(r=>setTimeout(r,ms));}
-function v(id){return document.getElementById(id).value.trim();}
 document.addEventListener('keydown',e=>{if(e.code==='Space'&&currentScreen==='screen-camera'){e.preventDefault();handleShutter();}if(e.code==='Escape'){closeModal();if(currentScreen==='screen-camera')confirmBack();}});
 </script>
 </body>
