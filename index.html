@@ -6,7 +6,7 @@
 <title>PixelBooth 64</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323:wght@400&family=Playfair+Display:wght@400;700&family=Montserrat:wght@300;600&family=Pacifico&family=Quicksand:wght@400;600&family=Cinzel:wght@400;700&family=EB+Garamond&family=Mountains+of+Christmas:wght@400;700&family=Nunito:wght@300;600&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://unpkg.com/qrcode@1.4.4/build/qrcode.js"></script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
@@ -799,12 +799,16 @@ async function saveAndShare() {
   showScreen('screen-share');
   document.getElementById('qr-wrap').style.display='none';
   document.getElementById('upload-status').textContent='⏳ Uploading...';
+  
+  // Robust check for the library under multiple common names
+  const qrLib = window.QRCode || window.qrcode || (typeof QRCode !== 'undefined' ? QRCode : null);
+
   try {
-    const url=await uploadToFirebase(capturedBlob,currentMode);
-    const qrLib = window.qrcode || window.QRCode;
-    if (!qrLib) {
+    if (!qrLib || typeof qrLib.toCanvas !== 'function') {
       throw new Error('QRCode library failed to load. Check your internet connection or use a local web server.');
     }
+
+    const url=await uploadToFirebase(capturedBlob,currentMode);
     
     currentUploadURL=url;
     document.getElementById('upload-status').textContent='✅ Saved! Scan to download:';
