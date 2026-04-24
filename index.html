@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>PixelBooth 64</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323:wght@400&family=Playfair+Display:wght@400;700&family=Montserrat:wght@300;600&family=Pacifico&family=Quicksand:wght@400;600&family=Cinzel:wght@400;700&family=EB+Garamond&family=Mountains+of+Christmas:wght@400;700&family=Nunito:wght@300;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+  window._firebaseModules = { initializeApp, getStorage, ref, uploadBytes, getDownloadURL };
+</script>
+<style>
+/* ── THEMES ─────────────────────────────────────────── */
+:root{
+  --bg:#0a0a1a;--bg2:#12123a;--surface:#1a1a4a;
+  --border:#ff00ff;--accent1:#ff00ff;--accent2:#00ffff;--accent3:#ffff00;
+  --text:#fff;--text2:#ccccff;
+  --btn-bg:#ff00ff;--btn-text:#000;--btn-shadow:#00ffff;
+  --font-title:'Press Start 2P',monospace;--font-body:'VT323',monospace;--font-size-body:1.4rem;
+  --scanlines:repeating-linear-gradient(0deg,rgba(0,0,0,.08) 0px,rgba(0,0,0,.08) 1px,transparent 1px,transparent 3px);
+  --pixel-border:4px solid var(--border);--glow:0 0 20px var(--accent1),0 0 40px var(--accent2);
+  --card-bg:rgba(255,0,255,.07);
+}
+[data-theme="elegant"]{--bg:#0d0d0d;--bg2:#1a1a1a;--surface:#222;--border:#c9a84c;--accent1:#c9a84c;--accent2:#e8d5a3;--accent3:#fff;--text:#f5f0e8;--text2:#b0a090;--btn-bg:#c9a84c;--btn-text:#000;--btn-shadow:#e8d5a3;--font-title:'Cinzel',serif;--font-body:'EB Garamond',serif;--font-size-body:1.2rem;--scanlines:none;--pixel-border:1px solid var(--border);--glow:0 0 20px rgba(201,168,76,.4),0 0 40px rgba(201,168,76,.2);--card-bg:rgba(201,168,76,.06);}
+[data-theme="tropical"]{--bg:#003d2b;--bg2:#004d35;--surface:#005e42;--border:#ff6b35;--accent1:#ff6b35;--accent2:#ffd700;--accent3:#00e5ff;--text:#fff;--text2:#b8f0d5;--btn-bg:#ff6b35;--btn-text:#fff;--btn-shadow:#ffd700;--font-title:'Pacifico',cursive;--font-body:'Quicksand',sans-serif;--font-size-body:1.1rem;--scanlines:none;--pixel-border:3px solid var(--border);--glow:0 0 20px rgba(255,107,53,.5),0 0 40px rgba(255,215,0,.3);--card-bg:rgba(255,107,53,.1);}
+[data-theme="diner"]{--bg:#1a0000;--bg2:#2d0000;--surface:#3d0a0a;--border:#ff3333;--accent1:#ff3333;--accent2:#fff;--accent3:#ffcc00;--text:#fff;--text2:#ffaaaa;--btn-bg:#ff3333;--btn-text:#fff;--btn-shadow:#ffcc00;--font-title:'Pacifico',cursive;--font-body:'Montserrat',sans-serif;--font-size-body:1rem;--scanlines:none;--pixel-border:3px solid var(--border);--glow:0 0 20px rgba(255,51,51,.6),0 0 40px rgba(255,204,0,.3);--card-bg:rgba(255,51,51,.08);}
+[data-theme="winter"]{--bg:#0a1628;--bg2:#0d1f3c;--surface:#162848;--border:#7ec8e3;--accent1:#7ec8e3;--accent2:#fff;--accent3:#b4e1f5;--text:#e8f4fd;--text2:#9ecfdf;--btn-bg:#7ec8e3;--btn-text:#0a1628;--btn-shadow:#fff;--font-title:'Mountains of Christmas',cursive;--font-body:'Nunito',sans-serif;--font-size-body:1.1rem;--scanlines:none;--pixel-border:2px solid var(--border);--glow:0 0 20px rgba(126,200,227,.5),0 0 40px rgba(255,255,255,.2);--card-bg:rgba(126,200,227,.08);}
+
+/* ── BASE ───────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:var(--font-size-body);touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+body::before{content:'';position:fixed;inset:0;background:var(--scanlines);pointer-events:none;z-index:9999}
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .3s;overflow-y:auto}
+.screen.active{opacity:1;pointer-events:all}
+
+/* ── HOME ───────────────────────────────────────────── */
+#screen-home{background:radial-gradient(ellipse at 50% 30%,var(--bg2) 0%,var(--bg) 70%);gap:22px}
+.app-title{font-family:var(--font-title);font-size:clamp(1.1rem,4.5vw,2rem);color:var(--accent1);text-shadow:var(--glow);line-height:1.5;text-align:center;animation:titlePulse 3s ease-in-out infinite}
+@keyframes titlePulse{0%,100%{text-shadow:0 0 20px var(--accent1),0 0 40px var(--accent2)}50%{text-shadow:0 0 40px var(--accent1),0 0 80px var(--accent2),0 0 120px var(--accent1)}}
+.app-subtitle{font-family:var(--font-body);font-size:clamp(.85rem,3vw,1.25rem);color:var(--accent2);opacity:.8;text-align:center}
+.mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%;max-width:520px}
+.mode-card{background:var(--card-bg);border:var(--pixel-border);border-radius:4px;padding:16px 10px;text-align:center;cursor:pointer;transition:transform .15s,box-shadow .15s,background .15s;user-select:none}
+.mode-card:active{transform:scale(.95)}
+.mode-card:hover{background:rgba(255,255,255,.1);box-shadow:var(--glow);transform:translateY(-2px)}
+.mode-icon{font-size:2.1rem;display:block;margin-bottom:5px}
+.mode-label{font-family:var(--font-title);font-size:clamp(.48rem,1.7vw,.68rem);color:var(--accent2);line-height:1.5}
+.mode-desc{font-family:var(--font-body);font-size:clamp(.78rem,2.3vw,1.05rem);color:var(--text2);margin-top:3px}
+.theme-bar{display:flex;gap:9px;align-items:center;flex-wrap:wrap;justify-content:center}
+.theme-label{font-family:var(--font-title);font-size:.48rem;color:var(--text2)}
+.theme-btn{width:30px;height:30px;border-radius:50%;border:2px solid transparent;cursor:pointer;transition:transform .2s,border-color .2s;font-size:1.1rem;display:flex;align-items:center;justify-content:center;background:none}
+.theme-btn:hover{transform:scale(1.2)}
+.theme-btn.active{border-color:var(--accent2);transform:scale(1.15)}
+.pixel-divider{width:100%;max-width:520px;height:2px;background:repeating-linear-gradient(90deg,var(--accent1) 0,var(--accent1) 8px,transparent 8px,transparent 12px);opacity:.4}
+
+/* ── BUTTONS ────────────────────────────────────────── */
+.btn{font-family:var(--font-title);font-size:clamp(.48rem,1.9vw,.7rem);background:var(--btn-bg);color:var(--btn-text);border:none;padding:12px 22px;cursor:pointer;transition:transform .1s,box-shadow .1s;box-shadow:4px 4px 0 var(--btn-shadow);border-radius:2px;letter-spacing:.05em;user-select:none;min-width:120px}
+.btn:active{transform:translate(3px,3px);box-shadow:1px 1px 0 var(--btn-shadow)}
+.btn:disabled{opacity:.4;pointer-events:none}
+.btn-secondary{background:transparent;color:var(--accent2);border:var(--pixel-border);box-shadow:3px 3px 0 var(--accent2)}
+.btn-danger{background:#c00;color:#fff;box-shadow:4px 4px 0 #600}
+.btn-sm{padding:8px 14px;font-size:.48rem;min-width:unset}
+.btn-large{width:74px;height:74px;border-radius:50%;padding:0;font-size:1.8rem;min-width:unset;display:flex;align-items:center;justify-content:center}
+.btn-back{background:transparent;color:var(--text2);border:1px solid var(--text2);box-shadow:none;padding:7px 13px;font-size:.46rem;min-width:unset}
+
+/* ── CAMERA ─────────────────────────────────────────── */
+#screen-camera{background:#000;padding:0;gap:0}
+.cam-header{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:linear-gradient(to bottom,rgba(0,0,0,.85),transparent);z-index:10}
+.cam-mode-lbl{font-family:var(--font-title);font-size:.56rem;color:var(--accent1);text-shadow:var(--glow)}
+.cam-progress{font-family:var(--font-title);font-size:.5rem;color:var(--accent2)}
+#video-preview{width:100%;height:100%;object-fit:cover;display:block;transform:scaleX(-1)}
+.countdown-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.4);z-index:20;pointer-events:none;opacity:0;transition:opacity .2s}
+.countdown-overlay.visible{opacity:1}
+.countdown-number{font-family:var(--font-title);font-size:clamp(5rem,22vw,9rem);color:var(--accent1);text-shadow:0 0 30px var(--accent1),0 0 60px var(--accent2);animation:countPop .4s ease-out}
+@keyframes countPop{0%{transform:scale(1.8);opacity:0}60%{transform:scale(.95)}100%{transform:scale(1);opacity:1}}
+.flash-overlay{position:absolute;inset:0;background:#fff;z-index:30;opacity:0;pointer-events:none}
+.flash-overlay.flash{animation:flashAnim .4s ease-out forwards}
+@keyframes flashAnim{0%{opacity:1}100%{opacity:0}}
+.cam-footer{position:absolute;bottom:0;left:0;right:0;display:flex;flex-direction:column;align-items:center;padding:16px;background:linear-gradient(to top,rgba(0,0,0,.88),transparent);z-index:10;gap:9px}
+.rec-indicator{display:flex;align-items:center;gap:8px;font-family:var(--font-title);font-size:.56rem;color:#ff4444;opacity:0;transition:opacity .3s}
+.rec-indicator.visible{opacity:1}
+.rec-dot{width:10px;height:10px;border-radius:50%;background:#ff4444;animation:recBlink 1s ease-in-out infinite}
+@keyframes recBlink{0%,100%{opacity:1}50%{opacity:0}}
+
+/* ── EDITOR ─────────────────────────────────────────── */
+#screen-editor{background:var(--bg);padding:0;justify-content:flex-start;overflow:hidden;gap:0}
+.editor-header{width:100%;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg2);border-bottom:var(--pixel-border);flex-shrink:0}
+.editor-title{font-family:var(--font-title);font-size:clamp(.5rem,1.8vw,.7rem);color:var(--accent1)}
+.editor-canvas-wrap{position:relative;flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#111;min-height:0;width:100%}
+#editor-canvas{display:block;max-width:100%;max-height:100%;touch-action:none}
+/* sticker DOM overlay */
+.sticker-el{position:fixed;cursor:grab;user-select:none;touch-action:none;display:flex;align-items:center;justify-content:center}
+.sticker-el.selected{outline:2px dashed var(--accent2)}
+.sticker-el .del-btn{position:absolute;top:-11px;right:-11px;width:22px;height:22px;border-radius:50%;background:#c00;color:#fff;border:none;font-size:.8rem;cursor:pointer;display:none;align-items:center;justify-content:center;z-index:5}
+.sticker-el.selected .del-btn{display:flex}
+.sticker-el .scl-btn{position:absolute;bottom:-11px;right:-11px;width:22px;height:22px;border-radius:50%;background:var(--accent1);color:#000;border:none;font-size:.9rem;cursor:se-resize;display:none;align-items:center;justify-content:center;z-index:5;touch-action:none}
+.sticker-el.selected .scl-btn{display:flex}
+.editor-toolbar{width:100%;background:var(--bg2);border-top:var(--pixel-border);flex-shrink:0}
+.toolbar-tabs{display:flex;border-bottom:1px solid var(--border)}
+.toolbar-tab{flex:1;padding:9px 4px;font-family:var(--font-title);font-size:clamp(.4rem,1.4vw,.56rem);color:var(--text2);background:none;border:none;cursor:pointer;transition:color .2s,background .2s}
+.toolbar-tab.active{color:var(--accent1);background:var(--card-bg)}
+.toolbar-panel{display:none;padding:9px 10px;overflow-x:auto;scrollbar-width:thin;gap:8px;flex-wrap:nowrap;min-height:66px;align-items:center}
+.toolbar-panel.active{display:flex}
+.sticker-pick{font-size:1.9rem;cursor:pointer;padding:3px;border-radius:4px;transition:transform .15s;flex-shrink:0}
+.sticker-pick:hover,.sticker-pick:active{transform:scale(1.35)}
+.frame-swatch{width:52px;height:52px;border-radius:4px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.5rem;font-family:var(--font-title);color:#fff;transition:transform .15s,outline .15s;outline:2px solid transparent;text-align:center;line-height:1.2}
+.frame-swatch:hover,.frame-swatch.active{transform:scale(1.1);outline:3px solid var(--accent2)}
+.editor-actions{display:flex;gap:8px;justify-content:center;padding:8px 10px;border-top:1px solid rgba(255,255,255,.1);flex-wrap:wrap}
+
+/* ── REVIEW ─────────────────────────────────────────── */
+#screen-review{background:var(--bg);gap:16px;overflow-y:auto;justify-content:flex-start;padding-top:26px}
+.review-title{font-family:var(--font-title);font-size:clamp(.62rem,2.4vw,.9rem);color:var(--accent1);text-shadow:var(--glow);text-align:center}
+#review-media-wrap{width:100%;max-width:560px;border:var(--pixel-border);box-shadow:var(--glow);border-radius:4px;overflow:hidden;background:#000}
+#review-photo{width:100%;display:block}
+#review-video{width:100%;display:block;max-height:48vh}
+.review-actions{display:flex;flex-wrap:wrap;gap:9px;justify-content:center;width:100%;max-width:560px;padding-bottom:20px}
+
+/* ── GUESTBOOK ──────────────────────────────────────── */
+#screen-guestbook{background:var(--bg);gap:13px}
+.guestbook-title{font-family:var(--font-title);font-size:clamp(.62rem,2.1vw,.88rem);color:var(--accent1);text-shadow:var(--glow);text-align:center}
+#whiteboard{border:var(--pixel-border);box-shadow:var(--glow);background:#fff;touch-action:none;cursor:crosshair;border-radius:4px;display:block}
+.drawing-tools{display:flex;gap:7px;align-items:center;flex-wrap:wrap;justify-content:center}
+.color-swatch{width:29px;height:29px;border-radius:50%;border:3px solid transparent;cursor:pointer;transition:transform .15s,border-color .15s}
+.color-swatch.active{border-color:var(--accent2);transform:scale(1.2)}
+.brush-dot{border-radius:50%;background:var(--text);cursor:pointer;transition:transform .15s}
+.brush-dot.active{background:var(--accent1);transform:scale(1.2)}
+
+/* ── SHARE ──────────────────────────────────────────── */
+#screen-share{background:var(--bg);gap:16px;overflow-y:auto;justify-content:flex-start;padding-top:26px}
+.share-title{font-family:var(--font-title);font-size:clamp(.62rem,2.4vw,.9rem);color:var(--accent1);text-shadow:var(--glow);text-align:center}
+.qr-wrap{background:#fff;padding:14px;border-radius:8px;display:flex;align-items:center;justify-content:center}
+.upload-status{font-family:var(--font-body);font-size:1.2rem;color:var(--accent2);text-align:center;min-height:28px}
+
+/* ── SETUP ──────────────────────────────────────────── */
+#screen-setup{background:var(--bg);gap:14px;overflow-y:auto;justify-content:flex-start;padding-top:16px;align-items:flex-start;max-width:700px;margin:0 auto}
+.setup-title{font-family:var(--font-title);font-size:clamp(.62rem,2.1vw,.88rem);color:var(--accent1);text-shadow:var(--glow);align-self:center}
+.setup-step{background:var(--card-bg);border:var(--pixel-border);border-radius:4px;padding:13px;width:100%}
+.step-num{font-family:var(--font-title);font-size:.53rem;color:var(--accent2);margin-bottom:6px}
+.step-text{font-family:var(--font-body);font-size:1.05rem;color:var(--text);line-height:1.6}
+.step-text a{color:var(--accent1)}
+.config-inputs{display:flex;flex-direction:column;gap:8px;width:100%}
+.config-input{background:var(--surface);border:var(--pixel-border);color:var(--text);font-family:var(--font-body);font-size:1.05rem;padding:8px 10px;width:100%;border-radius:2px;outline:none}
+.config-input:focus{box-shadow:var(--glow)}
+.config-input::placeholder{color:var(--text2);opacity:.6}
+.setup-actions{display:flex;gap:10px;justify-content:center;width:100%;flex-wrap:wrap;padding-bottom:26px}
+
+/* ── MODAL ──────────────────────────────────────────── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:1000;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s;padding:20px}
+.modal-overlay.visible{opacity:1;pointer-events:all}
+.modal-box{background:var(--surface);border:var(--pixel-border);box-shadow:var(--glow);padding:24px 20px;max-width:370px;width:100%;border-radius:4px;text-align:center;display:flex;flex-direction:column;gap:14px}
+.modal-title{font-family:var(--font-title);font-size:.75rem;color:var(--accent1)}
+.modal-text{font-family:var(--font-body);font-size:1.1rem;color:var(--text)}
+.modal-actions{display:flex;gap:9px;justify-content:center;flex-wrap:wrap}
+.toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:var(--surface);border:var(--pixel-border);color:var(--text);font-family:var(--font-body);font-size:1.05rem;padding:10px 20px;border-radius:4px;z-index:2000;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;max-width:90vw;text-align:center}
+.toast.visible{opacity:1}
+.pixel-bg-deco{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.pixel-block{position:absolute;width:6px;height:6px;animation:pixelFloat linear infinite;opacity:.15}
+@keyframes pixelFloat{0%{transform:translateY(100vh) rotate(0);opacity:0}10%{opacity:.15}90%{opacity:.15}100%{transform:translateY(-20px) rotate(360deg);opacity:0}}
+.snowflake{position:fixed;top:-20px;pointer-events:none;z-index:9998;animation:snowFall linear infinite;opacity:.7}
+@keyframes snowFall{to{transform:translateY(110vh) rotate(360deg);opacity:0}}
+</style>
+</head>
+<body>
+<div class="pixel-bg-deco" id="pixel-bg"></div>
+
+<!-- HOME -->
+<div class="screen active" id="screen-home">
+  <div style="text-align:center">
+    <div class="app-title" id="app-title">PixelBooth 64</div>
+    <div class="app-subtitle" id="app-subtitle">INSERT COIN TO CONTINUE</div>
+  </div>
+  <div class="pixel-divider"></div>
+  <div class="mode-grid">
+    <div class="mode-card" onclick="startMode('photo')"><span class="mode-icon">📷</span><div class="mode-label">SINGLE<br>PHOTO</div><div class="mode-desc">One perfect shot</div></div>
+    <div class="mode-card" onclick="startMode('filmstrip')"><span class="mode-icon">🎞️</span><div class="mode-label">FILM<br>STRIP</div><div class="mode-desc">4-photo collage</div></div>
+    <div class="mode-card" onclick="startMode('video')"><span class="mode-icon">🎬</span><div class="mode-label">VIDEO<br>MSG</div><div class="mode-desc">Up to 1 minute</div></div>
+    <div class="mode-card" onclick="startMode('guestbook')"><span class="mode-icon">✍️</span><div class="mode-label">GUEST<br>BOOK</div><div class="mode-desc">Draw a message</div></div>
+  </div>
+  <div class="theme-bar">
+    <span class="theme-label">THEME:</span>
+    <button class="theme-btn active" onclick="setTheme('gaming',this)" title="90s Gaming">🕹️</button>
+    <button class="theme-btn" onclick="setTheme('elegant',this)" title="Elegant">🥂</button>
+    <button class="theme-btn" onclick="setTheme('tropical',this)" title="Tropical">🌴</button>
+    <button class="theme-btn" onclick="setTheme('diner',this)" title="Retro Diner">🍔</button>
+    <button class="theme-btn" onclick="setTheme('winter',this)" title="Winter">❄️</button>
+  </div>
+  <button class="btn btn-secondary btn-sm" onclick="showScreen('screen-setup')">⚙ FIREBASE SETUP</button>
+</div>
+
+<!-- CAMERA -->
+<div class="screen" id="screen-camera">
+  <div class="cam-header">
+    <button class="btn btn-back" onclick="confirmBack()">← BACK</button>
+    <div class="cam-mode-lbl" id="cam-mode-lbl">PHOTO MODE</div>
+    <div class="cam-progress" id="cam-progress"></div>
+  </div>
+  <video id="video-preview" autoplay playsinline muted></video>
+  <div class="countdown-overlay" id="countdown-overlay"><div class="countdown-number" id="countdown-number">3</div></div>
+  <div class="flash-overlay" id="flash-overlay"></div>
+  <div class="cam-footer">
+    <div class="rec-indicator" id="rec-indicator"><div class="rec-dot"></div><span id="video-timer">0:00</span>&nbsp;REC</div>
+    <div style="display:flex;gap:14px;align-items:center">
+      <button class="btn btn-large" id="shutter-btn" onclick="handleShutter()">📸</button>
+      <button class="btn btn-danger" id="stop-btn" onclick="stopVideo()" style="display:none;padding:12px 18px;font-size:.56rem">⏹ STOP</button>
+    </div>
+    <div style="font-family:var(--font-title);font-size:.46rem;color:var(--text2);text-align:center" id="cam-hint">TAP TO START</div>
+  </div>
+</div>
+
+<!-- STICKER / FRAME EDITOR -->
+<div class="screen" id="screen-editor">
+  <div class="editor-header">
+    <button class="btn btn-back" onclick="skipEditor()">SKIP</button>
+    <div class="editor-title">✨ ADD STICKERS &amp; FRAMES</div>
+    <button class="btn btn-sm" onclick="flattenEditor()">DONE ✓</button>
+  </div>
+  <div class="editor-canvas-wrap" id="editor-canvas-wrap">
+    <canvas id="editor-canvas"></canvas>
+  </div>
+  <div class="editor-toolbar">
+    <div class="toolbar-tabs">
+      <button class="toolbar-tab active" id="tab-stickers" onclick="switchTab('stickers')">STICKERS</button>
+      <button class="toolbar-tab" id="tab-frames" onclick="switchTab('frames')">FRAMES</button>
+      <button class="toolbar-tab" id="tab-text" onclick="switchTab('text')">TEXT</button>
+    </div>
+    <!-- STICKERS -->
+    <div class="toolbar-panel active" id="panel-stickers">
+      <span style="font-family:var(--font-title);font-size:.4rem;color:var(--text2);white-space:nowrap">🎉 PARTY</span>
+      <span class="sticker-pick" onclick="addSticker('🎉')">🎉</span><span class="sticker-pick" onclick="addSticker('🎊')">🎊</span><span class="sticker-pick" onclick="addSticker('🥳')">🥳</span><span class="sticker-pick" onclick="addSticker('🍾')">🍾</span><span class="sticker-pick" onclick="addSticker('🎈')">🎈</span><span class="sticker-pick" onclick="addSticker('✨')">✨</span><span class="sticker-pick" onclick="addSticker('💥')">💥</span><span class="sticker-pick" onclick="addSticker('⭐')">⭐</span>
+      <span style="font-family:var(--font-title);font-size:.4rem;color:var(--text2);white-space:nowrap;margin-left:6px">🕹️ GAME</span>
+      <span class="sticker-pick" onclick="addSticker('🕹️')">🕹️</span><span class="sticker-pick" onclick="addSticker('👾')">👾</span><span class="sticker-pick" onclick="addSticker('🎮')">🎮</span><span class="sticker-pick" onclick="addSticker('💣')">💣</span><span class="sticker-pick" onclick="addSticker('🏆')">🏆</span><span class="sticker-pick" onclick="addSticker('👑')">👑</span><span class="sticker-pick" onclick="addSticker('💎')">💎</span><span class="sticker-pick" onclick="addSticker('🔮')">🔮</span>
+      <span style="font-family:var(--font-title);font-size:.4rem;color:var(--text2);white-space:nowrap;margin-left:6px">😎 FACES</span>
+      <span class="sticker-pick" onclick="addSticker('😎')">😎</span><span class="sticker-pick" onclick="addSticker('🤩')">🤩</span><span class="sticker-pick" onclick="addSticker('🥸')">🥸</span><span class="sticker-pick" onclick="addSticker('😜')">😜</span><span class="sticker-pick" onclick="addSticker('🤡')">🤡</span><span class="sticker-pick" onclick="addSticker('👓')">👓</span><span class="sticker-pick" onclick="addSticker('🎩')">🎩</span><span class="sticker-pick" onclick="addSticker('👒')">👒</span>
+      <span style="font-family:var(--font-title);font-size:.4rem;color:var(--text2);white-space:nowrap;margin-left:6px">❤️ LOVE</span>
+      <span class="sticker-pick" onclick="addSticker('❤️')">❤️</span><span class="sticker-pick" onclick="addSticker('💕')">💕</span><span class="sticker-pick" onclick="addSticker('💖')">💖</span><span class="sticker-pick" onclick="addSticker('💋')">💋</span><span class="sticker-pick" onclick="addSticker('🌹')">🌹</span>
+      <span style="font-family:var(--font-title);font-size:.4rem;color:var(--text2);white-space:nowrap;margin-left:6px">🌟 MORE</span>
+      <span class="sticker-pick" onclick="addSticker('🌈')">🌈</span><span class="sticker-pick" onclick="addSticker('🔥')">🔥</span><span class="sticker-pick" onclick="addSticker('⚡')">⚡</span><span class="sticker-pick" onclick="addSticker('🍕')">🍕</span><span class="sticker-pick" onclick="addSticker('🎸')">🎸</span><span class="sticker-pick" onclick="addSticker('🎵')">🎵</span><span class="sticker-pick" onclick="addSticker('🌊')">🌊</span><span class="sticker-pick" onclick="addSticker('🌸')">🌸</span><span class="sticker-pick" onclick="addSticker('🦄')">🦄</span><span class="sticker-pick" onclick="addSticker('🐉')">🐉</span>
+    </div>
+    <!-- FRAMES -->
+    <div class="toolbar-panel" id="panel-frames">
+      <div class="frame-swatch active" id="fsw-none" style="background:#333;border:2px solid #666" onclick="setFrame('none',this)">NONE</div>
+      <div class="frame-swatch" id="fsw-neon" style="background:linear-gradient(135deg,#f0f,#0ff);border:3px solid #fff" onclick="setFrame('neon',this)">NEON</div>
+      <div class="frame-swatch" id="fsw-gold" style="background:linear-gradient(135deg,#c9a84c,#f5e07a);border:3px solid #c9a84c" onclick="setFrame('gold',this)">GOLD</div>
+      <div class="frame-swatch" id="fsw-hearts" style="background:linear-gradient(135deg,#f46,#f8a);border:3px solid #f46" onclick="setFrame('hearts',this)">LOVE</div>
+      <div class="frame-swatch" id="fsw-stars" style="background:linear-gradient(135deg,#1a1a4a,#3a3aaa);border:3px solid #77f" onclick="setFrame('stars',this)">STARS</div>
+      <div class="frame-swatch" id="fsw-tropical" style="background:linear-gradient(135deg,#003d2b,#f63);border:3px solid #ffd700" onclick="setFrame('tropical',this)">TROPIC</div>
+      <div class="frame-swatch" id="fsw-polaroid" style="background:#f5f0e8;border:2px solid #ccc;color:#333" onclick="setFrame('polaroid',this)">POLAR</div>
+      <div class="frame-swatch" id="fsw-pixel" style="background:repeating-linear-gradient(45deg,#ff0,#f0f 10px,#0ff 10px,#0ff 20px);border:3px solid #fff" onclick="setFrame('pixel',this)">PIXEL</div>
+    </div>
+    <!-- TEXT -->
+    <div class="toolbar-panel" id="panel-text" style="flex-direction:column;align-items:flex-start;gap:7px;min-height:88px">
+      <div style="display:flex;gap:7px;align-items:center;width:100%">
+        <input id="text-input" type="text" placeholder="Type something..." maxlength="40"
+          style="flex:1;background:var(--surface);border:var(--pixel-border);color:var(--text);font-family:var(--font-body);font-size:1.05rem;padding:7px 9px;border-radius:2px;outline:none">
+        <button class="btn btn-sm" onclick="addTextSticker()">ADD</button>
+      </div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap">
+        <button class="btn btn-sm" style="min-width:unset;padding:5px 9px" onclick="setTextColor('#fff')">⬜</button>
+        <button class="btn btn-sm" style="min-width:unset;padding:5px 9px;background:#000;color:#fff" onclick="setTextColor('#000')">⬛</button>
+        <button class="btn btn-sm" style="min-width:unset;padding:5px 9px;background:#f0f" onclick="setTextColor('#f0f')">💜</button>
+        <button class="btn btn-sm" style="min-width:unset;padding:5px 9px;background:#f44" onclick="setTextColor('#f44')">❤️</button>
+        <button class="btn btn-sm" style="min-width:unset;padding:5px 9px;background:#fc0;color:#000" onclick="setTextColor('#fc0')">💛</button>
+        <button class="btn btn-sm" style="min-width:unset;padding:5px 9px;background:#0ef;color:#000" onclick="setTextColor('#0ef')">💙</button>
+      </div>
+    </div>
+    <div class="editor-actions">
+      <button class="btn btn-secondary btn-sm" onclick="undoLastSticker()">↩ UNDO</button>
+      <button class="btn btn-secondary btn-sm" onclick="clearAllStickers()">🗑 CLEAR</button>
+    </div>
+  </div>
+</div>
+
+<!-- REVIEW -->
+<div class="screen" id="screen-review">
+  <div class="review-title" id="review-title">✨ LOOKING GOOD!</div>
+  <div id="review-media-wrap">
+    <img id="review-photo" src="" alt="" style="display:none">
+    <video id="review-video" controls style="display:none"></video>
+  </div>
+  <div class="review-actions">
+    <button class="btn btn-danger" onclick="confirmDelete()">🗑 DELETE</button>
+    <button class="btn btn-secondary" onclick="openEditorAgain()">✏️ EDIT</button>
+    <button class="btn btn-secondary" onclick="confirmRetry()">🔄 RETRY</button>
+    <button class="btn" onclick="saveAndShare()">💾 SAVE &amp; SHARE</button>
+  </div>
+</div>
+
+<!-- SHARE -->
+<div class="screen" id="screen-share">
+  <div class="share-title">🎉 SAVED!</div>
+  <div class="upload-status" id="upload-status">Uploading...</div>
+  <div class="qr-wrap" id="qr-wrap" style="display:none"><canvas id="qr-canvas"></canvas></div>
+  <div style="font-family:var(--font-body);font-size:1.05rem;color:var(--text2);text-align:center;max-width:360px;padding:0 10px" id="share-instructions">Scan the QR code with your phone camera to download your photo!</div>
+  <div style="display:flex;gap:9px;flex-wrap:wrap;justify-content:center;padding-bottom:26px">
+    <button class="btn btn-secondary" onclick="downloadLocal()">⬇ DOWNLOAD</button>
+    <button class="btn" onclick="showScreen('screen-home')">🏠 MAIN MENU</button>
+  </div>
+</div>
+
+<!-- GUESTBOOK -->
+<div class="screen" id="screen-guestbook">
+  <div style="display:flex;align-items:center;justify-content:space-between;width:100%;max-width:700px">
+    <button class="btn btn-back" onclick="showScreen('screen-home')">← BACK</button>
+    <div class="guestbook-title">✍️ SIGN THE GUESTBOOK</div>
+    <div style="width:68px"></div>
+  </div>
+  <canvas id="whiteboard"></canvas>
+  <div class="drawing-tools">
+    <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center">
+      <div class="color-swatch active" style="background:#000" onclick="setColor('#000',this)"></div>
+      <div class="color-swatch" style="background:#f00" onclick="setColor('#f00',this)"></div>
+      <div class="color-swatch" style="background:#06f" onclick="setColor('#06f',this)"></div>
+      <div class="color-swatch" style="background:#0a0" onclick="setColor('#0a0',this)"></div>
+      <div class="color-swatch" style="background:#f90" onclick="setColor('#f90',this)"></div>
+      <div class="color-swatch" style="background:#90c" onclick="setColor('#90c',this)"></div>
+      <div class="color-swatch" style="background:#f6a" onclick="setColor('#f6a',this)"></div>
+      <div class="color-swatch" style="background:#fff;border:2px solid #888" onclick="setColor('#fff',this)"></div>
+    </div>
+    <div style="display:flex;gap:7px;align-items:center">
+      <span style="font-family:var(--font-title);font-size:.46rem;color:var(--text2)">SIZE:</span>
+      <div class="brush-dot active" style="width:10px;height:10px" onclick="setBrush(4,this)"></div>
+      <div class="brush-dot" style="width:16px;height:16px" onclick="setBrush(10,this)"></div>
+      <div class="brush-dot" style="width:22px;height:22px" onclick="setBrush(18,this)"></div>
+      <button class="btn btn-secondary btn-sm" id="eraser-btn" onclick="setEraser()">ERASE</button>
+    </div>
+  </div>
+  <div style="display:flex;gap:9px">
+    <button class="btn btn-secondary btn-sm" onclick="clearWhiteboard()">🗑 CLEAR</button>
+    <button class="btn btn-sm" onclick="captureGuestbook()">📸 CAPTURE</button>
+  </div>
+</div>
+
+<!-- SETUP -->
+<div class="screen" id="screen-setup">
+  <div class="setup-title">⚙ FIREBASE SETUP</div>
+  <p style="font-family:var(--font-body);font-size:1.05rem;color:var(--text2);text-align:center;max-width:560px">One-time setup (~10-15 min). All you need is a free Google account.</p>
+  <div class="setup-step">
+    <div class="step-num">STEP 1 — CREATE A FIREBASE PROJECT</div>
+    <div class="step-text">Go to <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a> and sign in. Click <b>"Add project"</b>, name it anything (e.g. "PixelBooth"), click through and hit <b>"Create project"</b>.</div>
+  </div>
+  <div class="setup-step">
+    <div class="step-num">STEP 2 — ADD A WEB APP</div>
+    <div class="step-text">Inside your project, click the <b>&lt;/&gt;</b> (Web) icon. Give it a nickname and click <b>"Register app"</b>. You'll see a config block — copy the values into the fields below.</div>
+  </div>
+  <div class="setup-step">
+    <div class="step-num">STEP 3 — ENABLE STORAGE</div>
+    <div class="step-text">Left sidebar: <b>Build → Storage → Get started</b>. Choose your region → Next → Done. Click the <b>Rules</b> tab and replace everything with:<br><br>
+      <code style="background:#000;padding:4px 8px;border-radius:3px;font-size:.9rem">allow read, write: if true;</code><br><br>Click <b>Publish</b>.</div>
+  </div>
+  <div class="setup-step">
+    <div class="step-num">STEP 4 — PASTE YOUR CONFIG</div>
+    <div class="config-inputs">
+      <input class="config-input" id="cfg-apiKey" placeholder="apiKey" autocomplete="off" spellcheck="false">
+      <input class="config-input" id="cfg-authDomain" placeholder="authDomain" autocomplete="off" spellcheck="false">
+      <input class="config-input" id="cfg-projectId" placeholder="projectId" autocomplete="off" spellcheck="false">
+      <input class="config-input" id="cfg-storageBucket" placeholder="storageBucket" autocomplete="off" spellcheck="false">
+      <input class="config-input" id="cfg-messagingSenderId" placeholder="messagingSenderId" autocomplete="off" spellcheck="false">
+      <input class="config-input" id="cfg-appId" placeholder="appId" autocomplete="off" spellcheck="false">
+    </div>
+  </div>
+  <div class="setup-actions">
+    <button class="btn" onclick="saveFirebaseConfig()">💾 SAVE CONFIG</button>
+    <button class="btn btn-secondary" onclick="showScreen('screen-home')">← BACK</button>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal">
+  <div class="modal-box">
+    <div class="modal-title" id="modal-title">ARE YOU SURE?</div>
+    <div class="modal-text" id="modal-text"></div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="modal-confirm">YES</button>
+      <button class="btn btn-secondary" onclick="closeModal()">CANCEL</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<canvas id="capture-canvas" style="display:none"></canvas>
+
+<script>
+// ════════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════════
+let currentMode = null, currentScreen = 'screen-home';
+let stream = null, mediaRecorder = null, recordedChunks = [];
+let filmstripPhotos = [];
+let capturedBlob = null, capturedDataURL = null, rawVideoURL = null;
+let capturedMimeType = 'image/jpeg';
+let videoTimerInterval = null, videoSeconds = 0, isCountingDown = false;
+let firebaseApp = null, firebaseStorage = null, firebaseConfig = null;
+let currentUploadURL = null, currentTheme = 'gaming';
+
+// Editor state
+let editorOrigDataURL = null;   // original unedited image for editor canvas
+let activeStickers = [];        // DOM sticker elements
+let selectedSticker = null;
+let currentFrame = 'none';
+let textColor = '#ffffff';
+
+// ════════════════════════════════════════════════════
+// THEMES
+// ════════════════════════════════════════════════════
+const THEMES = {
+  gaming:   { title:'PixelBooth 64', subtitle:'INSERT COIN TO CONTINUE', attr:null },
+  elegant:  { title:'Le Photomaton', subtitle:'A Soirée to Remember', attr:'elegant' },
+  tropical: { title:'Sunset Snaps', subtitle:'🌺 Strike a Pose 🌺', attr:'tropical' },
+  diner:    { title:"Frankie's Photo Diner", subtitle:'📸 Eat. Smile. Repeat.', attr:'diner' },
+  winter:   { title:'Snowflake Studio', subtitle:'❄ Make a Memory ❄', attr:'winter' },
+};
+
+function setTheme(id, btn) {
+  currentTheme = id;
+  const cfg = THEMES[id];
+  cfg.attr ? document.body.setAttribute('data-theme', cfg.attr) : document.body.removeAttribute('data-theme');
+  document.getElementById('app-title').textContent = cfg.title;
+  document.getElementById('app-subtitle').textContent = cfg.subtitle;
+  document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.snowflake').forEach(s => s.remove());
+  if (id === 'winter') initSnow();
+  initPixelBg();
+}
+function initPixelBg() {
+  const bg = document.getElementById('pixel-bg'); bg.innerHTML = '';
+  if (currentTheme !== 'gaming') return;
+  ['#ff00ff','#00ffff','#ffff00','#ff0088','#00ff88'].forEach(c => {
+    for (let j=0;j<3;j++) {
+      const el=document.createElement('div'); el.className='pixel-block';
+      el.style.cssText=`left:${Math.random()*100}vw;background:${c};animation-duration:${7+Math.random()*9}s;animation-delay:${Math.random()*10}s`;
+      bg.appendChild(el);
+    }
+  });
+}
+function initSnow() {
+  '❄❅❆✦*'.split('').forEach(e => {
+    for(let i=0;i<3;i++){
+      const el=document.createElement('div'); el.className='snowflake'; el.textContent=e;
+      el.style.cssText=`left:${Math.random()*100}vw;animation-duration:${5+Math.random()*8}s;animation-delay:${Math.random()*8}s;font-size:${.8+Math.random()*1.2}rem`;
+      document.body.appendChild(el);
+    }
+  });
+}
+window.addEventListener('load', () => { loadFirebaseConfig(); initPixelBg(); resizeWhiteboard(); window.addEventListener('resize', resizeWhiteboard); });
+
+// ════════════════════════════════════════════════════
+// FIREBASE
+// ════════════════════════════════════════════════════
+function loadFirebaseConfig() {
+  const s = localStorage.getItem('pixelbooth_firebase'); if(!s) return;
+  try { firebaseConfig=JSON.parse(s); Object.keys(firebaseConfig).forEach(k=>{const el=document.getElementById('cfg-'+k);if(el)el.value=firebaseConfig[k];}); initFirebase(); } catch(e){}
+}
+function saveFirebaseConfig() {
+  const cfg={apiKey:v('cfg-apiKey'),authDomain:v('cfg-authDomain'),projectId:v('cfg-projectId'),storageBucket:v('cfg-storageBucket'),messagingSenderId:v('cfg-messagingSenderId'),appId:v('cfg-appId')};
+  if(!cfg.apiKey||!cfg.projectId||!cfg.storageBucket){showToast('Fill in apiKey, projectId, storageBucket');return;}
+  localStorage.setItem('pixelbooth_firebase',JSON.stringify(cfg)); firebaseConfig=cfg; initFirebase(); showToast('✅ Firebase config saved!'); showScreen('screen-home');
+}
+function initFirebase() {
+  if(!firebaseConfig) return;
+  try { const{initializeApp,getStorage}=window._firebaseModules; try{firebaseApp=initializeApp(firebaseConfig,'pixelbooth');}catch(e){} firebaseStorage=getStorage(firebaseApp); } catch(e){console.warn('Firebase:',e.message);}
+}
+async function uploadToFirebase(blob, mode) {
+  if(!firebaseStorage) throw new Error('Firebase not configured. Go to ⚙ Setup first.');
+  const{ref,uploadBytes,getDownloadURL}=window._firebaseModules;
+  const today=new Date().toISOString().slice(0,10), ts=Date.now();
+  const ext=blob.type.includes('mp4')?'mp4':blob.type.includes('webm')?'webm':'jpg';
+  const path=`pixelbooth/${today}/${mode}_${ts}.${ext}`;
+  const storageRef=ref(firebaseStorage,path);
+  await uploadBytes(storageRef,blob);
+  return await getDownloadURL(storageRef);
+}
+
+// ════════════════════════════════════════════════════
+// NAVIGATION
+// ════════════════════════════════════════════════════
+function showScreen(id) { document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); currentScreen=id; }
+
+// ════════════════════════════════════════════════════
+// MODE ENTRY
+// ════════════════════════════════════════════════════
+async function startMode(mode) {
+  currentMode=mode; filmstripPhotos=[]; capturedBlob=null; capturedDataURL=null; rawVideoURL=null; currentUploadURL=null;
+  if(mode==='guestbook'){clearWhiteboard();showScreen('screen-guestbook');return;}
+  try {
+    if(stream) stream.getTracks().forEach(t=>t.stop());
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:1280},height:{ideal:720}},audio:mode==='video'});
+    const vid=document.getElementById('video-preview'); vid.srcObject=stream; await vid.play();
+  } catch(e){showToast('Camera access denied. Allow camera permissions and retry.');return;}
+  const lbl={photo:'PHOTO MODE',filmstrip:'FILMSTRIP MODE',video:'VIDEO MESSAGE'};
+  document.getElementById('cam-mode-lbl').textContent=lbl[mode];
+  document.getElementById('cam-progress').textContent=mode==='filmstrip'?'PHOTO 1 OF 4':'';
+  const sb=document.getElementById('shutter-btn');
+  sb.innerHTML=mode==='video'?'🎬':'📸'; sb.style.display='flex'; sb.disabled=false;
+  document.getElementById('stop-btn').style.display='none';
+  document.getElementById('rec-indicator').classList.remove('visible');
+  document.getElementById('cam-hint').textContent=mode==='video'?'TAP TO START RECORDING':'TAP TO TAKE PHOTO';
+  showScreen('screen-camera');
+}
+
+// ════════════════════════════════════════════════════
+// SHUTTER
+// ════════════════════════════════════════════════════
+async function handleShutter() {
+  if(isCountingDown) return;
+  if(currentMode==='video') await startVideoRecording();
+  else if(currentMode==='filmstrip') await captureFilmstrip();
+  else await capturePhoto();
+}
+
+async function capturePhoto() {
+  isCountingDown=true; document.getElementById('shutter-btn').disabled=true;
+  document.getElementById('cam-hint').textContent='GET READY...';
+  await countdown(); flashEffect();
+  const dataURL=captureFrame();
+  capturedBlob=dataURLToBlob(dataURL); capturedDataURL=dataURL; capturedMimeType='image/jpeg';
+  stopCamera(); openEditorWith(dataURL); isCountingDown=false;
+}
+
+async function captureFilmstrip() {
+  isCountingDown=true; filmstripPhotos=[];
+  const prog=document.getElementById('cam-progress');
+  document.getElementById('shutter-btn').disabled=true;
+  for(let i=0;i<4;i++){
+    prog.textContent=`PHOTO ${i+1} OF 4`;
+    document.getElementById('cam-hint').textContent=`PHOTO ${i+1} — SMILE!`;
+    await countdown(); flashEffect();
+    filmstripPhotos.push(captureFrame()); // each frame already correctly oriented
+    await delay(350);
+  }
+  stopCamera();
+  const collage=await buildCollage(filmstripPhotos);
+  capturedDataURL=collage; capturedBlob=dataURLToBlob(collage); capturedMimeType='image/jpeg';
+  openEditorWith(collage); isCountingDown=false;
+}
+
+async function startVideoRecording() {
+  isCountingDown=true; document.getElementById('shutter-btn').disabled=true;
+  document.getElementById('cam-hint').textContent='RECORDING STARTS SOON...';
+  await countdown();
+  recordedChunks=[];
+  const mimeType=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':MediaRecorder.isTypeSupported('video/webm')?'video/webm':'video/mp4';
+  mediaRecorder=new MediaRecorder(stream,{mimeType});
+  mediaRecorder.ondataavailable=e=>{if(e.data.size>0)recordedChunks.push(e.data);};
+  mediaRecorder.onstop=finishVideo; mediaRecorder.start(100);
+  document.getElementById('shutter-btn').style.display='none';
+  document.getElementById('stop-btn').style.display='flex';
+  document.getElementById('rec-indicator').classList.add('visible');
+  document.getElementById('cam-hint').textContent='RECORDING... MAX 1 MINUTE';
+  isCountingDown=false; videoSeconds=0; updateVideoTimer();
+  videoTimerInterval=setInterval(()=>{videoSeconds++;updateVideoTimer();if(videoSeconds>=60)stopVideo();},1000);
+}
+function updateVideoTimer(){const m=Math.floor(videoSeconds/60),s=videoSeconds%60;document.getElementById('video-timer').textContent=`${m}:${s.toString().padStart(2,'0')}`;}
+function stopVideo(){if(mediaRecorder&&mediaRecorder.state!=='inactive')mediaRecorder.stop();clearInterval(videoTimerInterval);}
+function finishVideo(){
+  const mimeType=recordedChunks[0]?.type||'video/webm';
+  capturedBlob=new Blob(recordedChunks,{type:mimeType}); capturedMimeType=mimeType;
+  rawVideoURL=URL.createObjectURL(capturedBlob);
+  stopCamera();
+  // Grab a poster frame at 0.5s for editor
+  const vid=document.createElement('video'); vid.src=rawVideoURL; vid.muted=true; vid.currentTime=0.5;
+  vid.addEventListener('seeked',()=>{
+    const c=document.createElement('canvas');
+    c.width=vid.videoWidth||1280; c.height=vid.videoHeight||720;
+    const ctx=c.getContext('2d');
+    // Mirror-correct the poster frame
+    ctx.save(); ctx.scale(-1,1); ctx.drawImage(vid,-c.width,0,c.width,c.height); ctx.restore();
+    openEditorWith(c.toDataURL('image/jpeg',.9));
+  },{once:true}); vid.load();
+}
+
+// ════════════════════════════════════════════════════
+// CAPTURE UTILS
+// ════════════════════════════════════════════════════
+function captureFrame() {
+  // Preview is CSS-mirrored (transform:scaleX(-1)) so the video stream is correct orientation
+  // We flip horizontally on canvas so the saved image reads correctly (un-mirror)
+  const video=document.getElementById('video-preview');
+  const canvas=document.getElementById('capture-canvas');
+  canvas.width=video.videoWidth||1280; canvas.height=video.videoHeight||720;
+  const ctx=canvas.getContext('2d');
+  ctx.save(); ctx.scale(-1,1); ctx.drawImage(video,-canvas.width,0,canvas.width,canvas.height); ctx.restore();
+  return canvas.toDataURL('image/jpeg',0.92);
+}
+
+async function buildCollage(photos) {
+  // Fixed cell size 640×480 (4:3). Cover-crop each photo to fill without stretching.
+  const CW=640, CH=480, GAP=6;
+  const canvas=document.createElement('canvas');
+  canvas.width=CW*2+GAP*3; canvas.height=CH*2+GAP*3;
+  const ctx=canvas.getContext('2d');
+  ctx.fillStyle='#111'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  const positions=[[GAP,GAP],[CW+GAP*2,GAP],[GAP,CH+GAP*2],[CW+GAP*2,CH+GAP*2]];
+  for(let i=0;i<4;i++){
+    await new Promise(res=>{
+      const img=new Image(); img.onload=()=>{
+        // Cover-fit: crop to fill CW×CH without stretching
+        const srcAR=img.naturalWidth/img.naturalHeight, dstAR=CW/CH;
+        let sx=0,sy=0,sw=img.naturalWidth,sh=img.naturalHeight;
+        if(srcAR>dstAR){sw=Math.round(img.naturalHeight*dstAR);sx=Math.round((img.naturalWidth-sw)/2);}
+        else{sh=Math.round(img.naturalWidth/dstAR);sy=Math.round((img.naturalHeight-sh)/2);}
+        ctx.drawImage(img,sx,sy,sw,sh,positions[i][0],positions[i][1],CW,CH); res();
+      }; img.src=photos[i];
+    });
+  }
+  return canvas.toDataURL('image/jpeg',0.92);
+}
+
+// ════════════════════════════════════════════════════
+// EDITOR
+// ════════════════════════════════════════════════════
+function openEditorWith(dataURL) {
+  editorOrigDataURL=dataURL;
+  activeStickers.forEach(s=>s.remove()); activeStickers=[]; selectedSticker=null;
+  currentFrame='none';
+  document.querySelectorAll('.frame-swatch').forEach(s=>s.classList.remove('active'));
+  document.getElementById('fsw-none').classList.add('active');
+
+  const img=new Image();
+  img.onload=()=>{
+    const wrap=document.getElementById('editor-canvas-wrap');
+    const wW=wrap.clientWidth||window.innerWidth, wH=wrap.clientHeight||(window.innerHeight*0.46);
+    const scale=Math.min(wW/img.naturalWidth, wH/img.naturalHeight, 1);
+    const ec=document.getElementById('editor-canvas');
+    ec.width=Math.round(img.naturalWidth*scale); ec.height=Math.round(img.naturalHeight*scale);
+    ec.getContext('2d').drawImage(img,0,0,ec.width,ec.height);
+  };
+  img.src=dataURL;
+  switchTab('stickers');
+  showScreen('screen-editor');
+}
+
+function openEditorAgain() { if(capturedDataURL) openEditorWith(capturedDataURL); }
+
+function switchTab(name) {
+  ['stickers','frames','text'].forEach(n=>{
+    document.getElementById('panel-'+n).classList.toggle('active',n===name);
+    document.getElementById('tab-'+n).classList.toggle('active',n===name);
+  });
+}
+
+// ── STICKERS ──────────────────────────────────────────
+function addSticker(emoji) {
+  const ec=document.getElementById('editor-canvas'), rect=ec.getBoundingClientRect();
+  const el=document.createElement('div'); el.className='sticker-el';
+  const span=document.createElement('span');
+  span.textContent=emoji; span.style.cssText='font-size:3rem;line-height:1;pointer-events:none';
+  el.appendChild(span);
+  const del=document.createElement('button'); del.className='del-btn'; del.textContent='✕';
+  del.onclick=()=>removeSticker(el); el.appendChild(del);
+  const scl=document.createElement('div'); scl.className='scl-btn'; scl.textContent='⤡'; el.appendChild(scl);
+  el.style.cssText=`left:${rect.left+rect.width/2-30}px;top:${rect.top+rect.height/2-30}px;width:60px;height:60px`;
+  document.body.appendChild(el); activeStickers.push(el);
+  makeDraggable(el); makeScalable(el,span); selectSticker(el);
+}
+
+function addTextSticker() {
+  const txt=document.getElementById('text-input').value.trim(); if(!txt){showToast('Type something first!');return;}
+  const ec=document.getElementById('editor-canvas'), rect=ec.getBoundingClientRect();
+  const el=document.createElement('div'); el.className='sticker-el';
+  el.style.cssText=`left:${rect.left+rect.width/2-70}px;top:${rect.top+rect.height/2-20}px;padding:4px 8px;min-width:80px;min-height:38px`;
+  const span=document.createElement('span'); span.textContent=txt;
+  span.style.cssText=`font-family:var(--font-title);font-size:1rem;color:${textColor};text-shadow:0 1px 4px rgba(0,0,0,.8);white-space:nowrap;pointer-events:none`;
+  el.appendChild(span);
+  const del=document.createElement('button'); del.className='del-btn'; del.textContent='✕';
+  del.onclick=()=>removeSticker(el); el.appendChild(del);
+  const scl=document.createElement('div'); scl.className='scl-btn'; scl.textContent='⤡'; el.appendChild(scl);
+  document.body.appendChild(el); activeStickers.push(el);
+  makeDraggable(el); makeScalable(el,span); selectSticker(el);
+  document.getElementById('text-input').value='';
+}
+
+function setTextColor(c){textColor=c;}
+function removeSticker(el){el.remove();activeStickers=activeStickers.filter(s=>s!==el);if(selectedSticker===el)selectedSticker=null;}
+function selectSticker(el){if(selectedSticker)selectedSticker.classList.remove('selected');selectedSticker=el;if(el)el.classList.add('selected');}
+function undoLastSticker(){if(!activeStickers.length)return;const last=activeStickers.pop();last.remove();if(selectedSticker===last)selectedSticker=null;}
+function clearAllStickers(){activeStickers.forEach(s=>s.remove());activeStickers=[];selectedSticker=null;setFrame('none',document.getElementById('fsw-none'));}
+
+document.addEventListener('click',e=>{
+  const inSticker=e.target.closest('.sticker-el');
+  const inCanvas=e.target.id==='editor-canvas';
+  if(!inSticker&&currentScreen==='screen-editor'){if(selectedSticker){selectedSticker.classList.remove('selected');selectedSticker=null;}}
+});
+
+// ── DRAG ─────────────────────────────────────────────
+function makeDraggable(el) {
+  let sx,sy,ox,oy;
+  const dn=e=>{
+    if(e.target.classList.contains('del-btn')||e.target.classList.contains('scl-btn'))return;
+    e.preventDefault(); selectSticker(el);
+    const pt=e.touches?e.touches[0]:e; sx=pt.clientX;sy=pt.clientY;
+    const r=el.getBoundingClientRect(); ox=r.left;oy=r.top;
+    document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
+    document.addEventListener('touchmove',mv,{passive:false}); document.addEventListener('touchend',up);
+  };
+  const mv=e=>{e.preventDefault();const pt=e.touches?e.touches[0]:e;el.style.left=(ox+pt.clientX-sx)+'px';el.style.top=(oy+pt.clientY-sy)+'px';};
+  const up=()=>{document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);document.removeEventListener('touchmove',mv);document.removeEventListener('touchend',up);};
+  el.addEventListener('mousedown',dn); el.addEventListener('touchstart',dn,{passive:false});
+}
+
+// ── SCALE ─────────────────────────────────────────────
+function makeScalable(el,span) {
+  const scl=el.querySelector('.scl-btn');
+  let sx,sy,sw,sh;
+  const dn=e=>{e.preventDefault();e.stopPropagation();const pt=e.touches?e.touches[0]:e;sx=pt.clientX;sy=pt.clientY;sw=el.offsetWidth;sh=el.offsetHeight;
+    document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);
+    document.addEventListener('touchmove',mv,{passive:false});document.addEventListener('touchend',up);};
+  const mv=e=>{e.preventDefault();const pt=e.touches?e.touches[0]:e;const d=Math.max(pt.clientX-sx,pt.clientY-sy);
+    const nw=Math.max(36,sw+d),nh=Math.max(36,sh+d);
+    el.style.width=nw+'px';el.style.height=nh+'px';
+    if(span){const ratio=nw/Math.max(sw,1);span.style.fontSize=Math.max(.5,parseFloat(span.style.fontSize||'3')*ratio)+'rem';}};
+  const up=()=>{document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);document.removeEventListener('touchmove',mv);document.removeEventListener('touchend',up);};
+  scl.addEventListener('mousedown',dn); scl.addEventListener('touchstart',dn,{passive:false});
+}
+
+// ── FRAMES ────────────────────────────────────────────
+function setFrame(id,el) {
+  currentFrame=id;
+  document.querySelectorAll('.frame-swatch').forEach(s=>s.classList.remove('active'));
+  el.classList.add('active');
+  redrawEditorCanvas();
+}
+function redrawEditorCanvas() {
+  const ec=document.getElementById('editor-canvas'), ctx=ec.getContext('2d');
+  const img=new Image(); img.onload=()=>{ctx.clearRect(0,0,ec.width,ec.height);ctx.drawImage(img,0,0,ec.width,ec.height);renderFrame(ctx,ec.width,ec.height);}; img.src=editorOrigDataURL;
+}
+function renderFrame(ctx,W,H) {
+  if(currentFrame==='none')return;
+  const t=Math.round(Math.min(W,H)*0.034);
+  if(currentFrame==='neon'){
+    const g=ctx.createLinearGradient(0,0,W,H);g.addColorStop(0,'#ff00ff');g.addColorStop(1,'#00ffff');
+    ctx.strokeStyle=g;ctx.lineWidth=t*2;ctx.strokeRect(t,t,W-t*2,H-t*2);
+    ctx.strokeStyle='rgba(255,255,255,0.35)';ctx.lineWidth=2;ctx.strokeRect(t*2,t*2,W-t*4,H-t*4);
+  } else if(currentFrame==='gold'){
+    ctx.strokeStyle='#c9a84c';ctx.lineWidth=t*2;ctx.strokeRect(t,t,W-t*2,H-t*2);
+    ctx.strokeStyle='#f5e07a';ctx.lineWidth=2;ctx.strokeRect(t*2,t*2,W-t*4,H-t*4);
+    ctx.strokeStyle='#7a4f00';ctx.lineWidth=1;ctx.strokeRect(t*2+3,t*2+3,W-t*4-6,H-t*4-6);
+  } else if(currentFrame==='hearts'){
+    const bc='rgba(255,68,102,0.90)';
+    ctx.fillStyle=bc;ctx.fillRect(0,0,W,t*2);ctx.fillRect(0,H-t*2,W,t*2);ctx.fillRect(0,t*2,t*2,H-t*4);ctx.fillRect(W-t*2,t*2,t*2,H-t*4);
+    ctx.font=`${t*1.5}px serif`;ctx.textAlign='center';ctx.textBaseline='middle';
+    const sp=t*3.5;
+    for(let x=sp*.5;x<W;x+=sp){ctx.fillText('❤',x,t);ctx.fillText('❤',x,H-t);}
+    for(let y=sp*.5+t*2;y<H-t*2;y+=sp){ctx.fillText('❤',t,y);ctx.fillText('❤',W-t,y);}
+  } else if(currentFrame==='stars'){
+    ctx.fillStyle='rgba(10,10,60,0.88)';ctx.fillRect(0,0,W,t*2);ctx.fillRect(0,H-t*2,W,t*2);ctx.fillRect(0,t*2,t*2,H-t*4);ctx.fillRect(W-t*2,t*2,t*2,H-t*4);
+    ctx.font=`${t*1.3}px serif`;ctx.textAlign='center';ctx.textBaseline='middle';
+    const sp=t*3.5;
+    for(let x=sp*.5;x<W;x+=sp){ctx.fillText('⭐',x,t);ctx.fillText('⭐',x,H-t);}
+    for(let y=sp*.5+t*2;y<H-t*2;y+=sp){ctx.fillText('⭐',t,y);ctx.fillText('⭐',W-t,y);}
+  } else if(currentFrame==='tropical'){
+    ctx.fillStyle='rgba(0,50,30,0.90)';ctx.fillRect(0,0,W,t*2);ctx.fillRect(0,H-t*2,W,t*2);ctx.fillRect(0,t*2,t*2,H-t*4);ctx.fillRect(W-t*2,t*2,t*2,H-t*4);
+    ctx.font=`${t*1.4}px serif`;ctx.textAlign='center';ctx.textBaseline='middle';
+    const sp=t*3.5,icons=['🌺','🌴','🍍','🌊'];let idx=0;
+    for(let x=sp*.5;x<W;x+=sp,idx++){ctx.fillText(icons[idx%4],x,t);ctx.fillText(icons[(idx+2)%4],x,H-t);}
+    for(let y=sp*.5+t*2;y<H-t*2;y+=sp,idx++){ctx.fillText(icons[idx%4],t,y);ctx.fillText(icons[(idx+2)%4],W-t,y);}
+  } else if(currentFrame==='polaroid'){
+    ctx.fillStyle='#f5f0e8';ctx.fillRect(0,0,W,t*1.5);ctx.fillRect(0,H-t*5,W,t*5);ctx.fillRect(0,0,t*1.5,H);ctx.fillRect(W-t*1.5,0,t*1.5,H);
+    ctx.strokeStyle='#ddd';ctx.lineWidth=1;ctx.strokeRect(0,0,W,H);
+  } else if(currentFrame==='pixel'){
+    const sz=Math.max(t,8);const cols=['#ff00ff','#00ffff','#ffff00','#ff0088'];
+    for(let x=0;x<W;x+=sz){ctx.fillStyle=cols[Math.floor(x/sz)%4];ctx.fillRect(x,0,sz,sz);ctx.fillRect(x,H-sz,sz,sz);}
+    for(let y=sz;y<H-sz;y+=sz){ctx.fillStyle=cols[Math.floor(y/sz)%4];ctx.fillRect(0,y,sz,sz);ctx.fillRect(W-sz,y,sz,sz);}
+  }
+}
+
+// ── FLATTEN ───────────────────────────────────────────
+function flattenEditor() {
+  const ec=document.getElementById('editor-canvas');
+  const ecRect=ec.getBoundingClientRect();
+  const base=new Image();
+  base.onload=()=>{
+    const scaleX=base.naturalWidth/ec.width, scaleY=base.naturalHeight/ec.height;
+    const oc=document.createElement('canvas');
+    oc.width=base.naturalWidth; oc.height=base.naturalHeight;
+    const octx=oc.getContext('2d');
+    // Draw base image (with any frame already painted on ec)
+    octx.drawImage(ec,0,0,oc.width,oc.height);
+    // Flatten stickers
+    const promises=activeStickers.map(sEl=>new Promise(res=>{
+      const sr=sEl.getBoundingClientRect();
+      const x=(sr.left-ecRect.left)*scaleX, y=(sr.top-ecRect.top)*scaleY;
+      const w=sr.width*scaleX, h=sr.height*scaleY;
+      const span=sEl.querySelector('span'); if(!span){res();return;}
+      const content=span.textContent;
+      const isEmoji=/\p{Emoji}/u.test(content)&&[...content].length<=2;
+      const fs=isEmoji?Math.round(h*.88):Math.round(parseFloat(span.style.fontSize||'1')*30*scaleX);
+      octx.save();
+      octx.font=`${fs}px ${isEmoji?'serif':"'Press Start 2P',monospace"}`;
+      octx.textAlign='left'; octx.textBaseline='top';
+      if(!isEmoji){octx.strokeStyle='rgba(0,0,0,.75)';octx.lineWidth=Math.max(2,fs/10);octx.strokeText(content,x+2,y+2);octx.fillStyle=span.style.color||'#fff';}
+      octx.fillText(content,x+2,y+2);
+      octx.restore(); res();
+    }));
+    Promise.all(promises).then(()=>{
+      const finalURL=oc.toDataURL('image/jpeg',0.92);
+      capturedDataURL=finalURL; capturedBlob=dataURLToBlob(finalURL);
+      activeStickers.forEach(s=>s.remove()); activeStickers=[];
+      showReview();
+    });
+  };
+  base.src=editorOrigDataURL;
+}
+
+function skipEditor() { activeStickers.forEach(s=>s.remove()); activeStickers=[]; showReview(); }
+
+// ════════════════════════════════════════════════════
+// REVIEW
+// ════════════════════════════════════════════════════
+function showReview() {
+  const photo=document.getElementById('review-photo'), video=document.getElementById('review-video');
+  const titles={photo:'📷 LOOKING GOOD!',filmstrip:'🎞️ YOUR FILMSTRIP!',video:'🎬 PLAYBACK TIME!',guestbook:'✍️ SIGNED!'};
+  document.getElementById('review-title').textContent=titles[currentMode]||'✨ REVIEW';
+  if(currentMode==='video'){video.src=rawVideoURL;video.style.display='block';photo.style.display='none';}
+  else{photo.src=capturedDataURL;photo.style.display='block';video.style.display='none';}
+  showScreen('screen-review');
+}
+function confirmDelete(){showModal('DELETE THIS?','Capture will be deleted. Return to main menu?',()=>{cleanupCapture();showScreen('screen-home');});}
+function confirmRetry(){showModal('RETRY?','Current capture will NOT be saved. Restart this mode?',()=>{const m=currentMode;cleanupCapture();startMode(m);});}
+function confirmBack(){showModal('GO BACK?','Leave this mode and return to main menu?',()=>{stopCamera();showScreen('screen-home');});}
+
+async function saveAndShare() {
+  if(!firebaseConfig){showToast('⚙ Set up Firebase first (tap ⚙ FIREBASE SETUP on main menu)');return;}
+  showScreen('screen-share');
+  document.getElementById('qr-wrap').style.display='none';
+  document.getElementById('upload-status').textContent='⏳ Uploading...';
+  try {
+    const url=await uploadToFirebase(capturedBlob,currentMode);
+    currentUploadURL=url;
+    document.getElementById('upload-status').textContent='✅ Saved! Scan to download:';
+    document.getElementById('share-instructions').textContent='Scan with your phone camera to download your '+(capturedMimeType.includes('video')?'video':'photo')+'!';
+    document.getElementById('qr-wrap').style.display='flex';
+    QRCode.toCanvas(document.getElementById('qr-canvas'),url,{width:220,margin:2,color:{dark:'#000',light:'#fff'}});
+  } catch(e){document.getElementById('upload-status').textContent='❌ Upload failed: '+e.message;}
+}
+function downloadLocal() {
+  if(!capturedBlob&&!capturedDataURL)return;
+  const ext=capturedMimeType.includes('mp4')?'mp4':capturedMimeType.includes('webm')?'webm':'jpg';
+  const a=document.createElement('a'); a.href=capturedBlob?URL.createObjectURL(capturedBlob):capturedDataURL;
+  a.download=`pixelbooth_${Date.now()}.${ext}`; a.click();
+}
+
+// ════════════════════════════════════════════════════
+// GUESTBOOK
+// ════════════════════════════════════════════════════
+let drawCtx,isDrawing=false,lastX=0,lastY=0,drawColor='#000',drawSize=4,isErasing=false;
+function resizeWhiteboard() {
+  const canvas=document.getElementById('whiteboard');
+  const maxW=Math.min(window.innerWidth-40,700), maxH=Math.min(window.innerHeight*.40,340);
+  let saved=null; if(drawCtx)saved=drawCtx.getImageData(0,0,canvas.width,canvas.height);
+  canvas.width=maxW; canvas.height=maxH;
+  drawCtx=canvas.getContext('2d'); drawCtx.fillStyle='#fff'; drawCtx.fillRect(0,0,maxW,maxH);
+  if(saved)drawCtx.putImageData(saved,0,0);
+  // Re-attach events
+  const c=document.getElementById('whiteboard');
+  c.onmousedown=e=>{isDrawing=true;const p=ptOf(c,e);lastX=p.x;lastY=p.y;};
+  c.onmousemove=e=>{if(!isDrawing)return;const p=ptOf(c,e);doDraw(p.x,p.y);};
+  c.onmouseup=c.onmouseleave=()=>isDrawing=false;
+  c.ontouchstart=e=>{e.preventDefault();isDrawing=true;const p=ptOf(c,e.touches[0]);lastX=p.x;lastY=p.y;};
+  c.ontouchmove=e=>{e.preventDefault();if(!isDrawing)return;const p=ptOf(c,e.touches[0]);doDraw(p.x,p.y);};
+  c.ontouchend=()=>isDrawing=false;
+}
+function ptOf(el,e){const r=el.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};}
+function doDraw(x,y){if(!drawCtx)return;drawCtx.beginPath();drawCtx.moveTo(lastX,lastY);drawCtx.lineTo(x,y);drawCtx.strokeStyle=isErasing?'#fff':drawColor;drawCtx.lineWidth=isErasing?drawSize*4:drawSize;drawCtx.lineCap='round';drawCtx.lineJoin='round';drawCtx.stroke();lastX=x;lastY=y;}
+function setColor(c,el){drawColor=c;isErasing=false;document.querySelectorAll('.color-swatch').forEach(s=>s.classList.remove('active'));el.classList.add('active');document.getElementById('eraser-btn').style.opacity='1';}
+function setBrush(s,el){drawSize=s;document.querySelectorAll('.brush-dot').forEach(d=>d.classList.remove('active'));el.classList.add('active');}
+function setEraser(){isErasing=true;document.getElementById('eraser-btn').style.opacity='.45';}
+function clearWhiteboard(){const c=document.getElementById('whiteboard');if(!drawCtx)return;drawCtx.fillStyle='#fff';drawCtx.fillRect(0,0,c.width,c.height);}
+function captureGuestbook(){const c=document.getElementById('whiteboard');const dataURL=c.toDataURL('image/jpeg',.95);capturedDataURL=dataURL;capturedBlob=dataURLToBlob(dataURL);capturedMimeType='image/jpeg';openEditorWith(dataURL);}
+
+// ════════════════════════════════════════════════════
+// COUNTDOWN & FLASH
+// ════════════════════════════════════════════════════
+async function countdown(){
+  const ov=document.getElementById('countdown-overlay'),n=document.getElementById('countdown-number');
+  ov.classList.add('visible');
+  for(let i=3;i>=1;i--){n.textContent=i;n.style.animation='none';n.offsetHeight;n.style.animation='countPop .4s ease-out';await delay(900);}
+  ov.classList.remove('visible');
+}
+function flashEffect(){const f=document.getElementById('flash-overlay');f.classList.remove('flash');f.offsetHeight;f.classList.add('flash');}
+
+// ════════════════════════════════════════════════════
+// MODAL & TOAST
+// ════════════════════════════════════════════════════
+let modalCb=null;
+function showModal(title,text,cb){document.getElementById('modal-title').textContent=title;document.getElementById('modal-text').textContent=text;modalCb=cb;document.getElementById('modal-confirm').onclick=()=>{closeModal();if(modalCb)modalCb();};document.getElementById('modal').classList.add('visible');}
+function closeModal(){document.getElementById('modal').classList.remove('visible');}
+let toastT=null;
+function showToast(msg,dur=3200){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('visible');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('visible'),dur);}
+
+// ════════════════════════════════════════════════════
+// UTILS
+// ════════════════════════════════════════════════════
+function stopCamera(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}clearInterval(videoTimerInterval);const vid=document.getElementById('video-preview');vid.srcObject=null;document.getElementById('rec-indicator').classList.remove('visible');document.getElementById('shutter-btn').style.display='flex';document.getElementById('shutter-btn').disabled=false;document.getElementById('stop-btn').style.display='none';}
+function cleanupCapture(){if(rawVideoURL)URL.revokeObjectURL(rawVideoURL);capturedBlob=null;capturedDataURL=null;rawVideoURL=null;filmstripPhotos=[];activeStickers.forEach(s=>s.remove());activeStickers=[];stopCamera();}
+function dataURLToBlob(dataURL){const arr=dataURL.split(','),mime=arr[0].match(/:(.*?);/)[1];const b=atob(arr[1]);let n=b.length;const u=new Uint8Array(n);while(n--)u[n]=b.charCodeAt(n);return new Blob([u],{type:mime});}
+function delay(ms){return new Promise(r=>setTimeout(r,ms));}
+function v(id){return document.getElementById(id).value.trim();}
+document.addEventListener('keydown',e=>{if(e.code==='Space'&&currentScreen==='screen-camera'){e.preventDefault();handleShutter();}if(e.code==='Escape'){closeModal();if(currentScreen==='screen-camera')confirmBack();}});
+</script>
+</body>
+</html>
