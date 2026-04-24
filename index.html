@@ -609,81 +609,79 @@ function switchTab(name) {
 }
 
 // ── STICKERS ──────────────────────────────────────────
-function addSticker(emoji) {
-  const ec=document.getElementById('editor-canvas'), rect=ec.getBoundingClientRect();
-  const el=document.createElement('div'); el.className='sticker-el';
-  const span=document.createElement('span');
-  span.textContent=emoji; span.style.cssText='font-size:3rem;line-height:1;pointer-events:none';
-  el.appendChild(span);
-  const del=document.createElement('button'); del.className='del-btn'; del.textContent='✕';
-  del.onclick=()=>removeSticker(el); el.appendChild(del);
-  const scl=document.createElement('div'); scl.className='scl-btn'; scl.textContent='⤡'; el.appendChild(scl);
-  el.style.cssText=`left:${rect.left+rect.width/2-30}px;top:${rect.top+rect.height/2-30}px;width:60px;height:60px`;
-  document.body.appendChild(el); activeStickers.push(el);
-  makeDraggable(el); makeScalable(el,span); selectSticker(el);
+function getStickerBounds(s, ctx) {
+  const oldFont = ctx.font;
+  ctx.font = s.type === 'text' ? `${s.size}px 'Press Start 2P', monospace` : `${s.size}px serif`;
+  const metrics = ctx.measureText(s.content);
+  ctx.font = oldFont;
+  return { w: metrics.width, h: s.size };
 }
+function getCanvasPoint(e) {
+  const ec = document.getElementById('editor-canvas'), rect = ec.getBoundingClientRect();
+  const pt = e.touches ? e.touches[0] : e;
+  return { x: pt.clientX - rect.left, y: pt.clientY - rect.top };
+}
+function getLocalPoint(pt, s) {
+  const dx = pt.x - s.x, dy = pt.y - s.y;
+  const cos = Math.cos(-(s.rotation || 0)), sin = Math.sin(-(s.rotation || 0));
+  return { x: dx * cos - dy * sin, y: dx * sin + dy * cos };
+}
+function handleCanvasPointerDown(e) {
+  if(currentScreen !== 'screen-editor') return;
+  const pt = getCanvasPoint(e), ec = document.getElementById('editor-canvas'), ctx = ec.getContext('2d');
+  if(selectedSticker) {
+    const b = getStickerBounds(selectedSticker, ctx);
+    const lp = getLocalPoint(pt, selectedSticker);
+    if(lp.x >= b.w/2+5 && lp.x <= b.w/2+25 && lp.y >= -b.h/2-15 && lp.y <= -b.h/2+5) {
+      activeStickers = activeStickers.filter(s => s !== selectedSticker); selectedSticker = null; redrawEditorCanvas(); return;
+    }
+    if(lp.x >= b.w/2+5 && lp.x <= b.w/2+25 && lp.y >= b.h/2+5 && lp.y <= b.h/2+25) {
+      isResizing = true; return;
+    }
+    if(lp.x >= -10 && lp.x <= 10 && lp.y >= -b.h/2-35 && lp.y <= -b.h/2-15) {
+      isRotating = true; startRotation = Math.atan2(pt.y - selectedSticker.y, pt.x - selectedSticker.x) - (selectedSticker.rotation || 0); return;
+    }
+  }
+  let hit = null;
+  for(let i=activeStickers.length-1; i>=0; i--) {
+    const s = activeStickers[i], b = getStickerBounds(s, ctx);
+    const lp = getLocalPoint(pt, s);
+    if(lp.x >= -b.w/2-5 && lp.x <= b.w/2+5 && lp.y >= -b.h/2-5 && lp.y <= b.h/2+5) { hit = s; break; }
+  }
+  if(hit) {
+    selectedSticker = hit; isDragging = true; dragStartX = pt.x - hit.x; dragStartY = pt.y - hit.y;
+    redrawEditorCanvas();
+  } else if(selectedSticker) { selectedSticker = null; redrawEditorCanvas(); }
+}
+function handleCanvasPointerMove(e) {
+  if(!selectedSticker || (!isDragging && !isResizing && !isRotating)) return;
+  const pt = getCanvasPoint(e);
+  if(isDragging) { selectedSticker.x = pt.x - dragStartX; selectedSticker.y = pt.y - dragStartY; }
+  else if(isResizing) {
+    const dx = pt.x - selectedSticker.x, dy = pt.y - selectedSticker.y;
+    selectedSticker.size = Math.max(10, Math.sqrt(dx*dx + dy*dy) * 1.2);
+  }
+  else if(isRotating) {
+    selectedSticker.rotation = Math.atan2(pt.y - selectedSticker.y, pt.x - selectedSticker.x) - startRotation;
+  }
+  redrawEditorCanvas(); if(e.cancelable) e.preventDefault();
+}
+function handleCanvasPointerUp() { isDragging = false; isResizing = false; isRotating = false; }
 
+function addSticker(emoji) {
+  const ec=document.getElementById('editor-canvas');
+  const sticker = { type: 'emoji', content: emoji, x: ec.width/2, y: ec.height/2, size: 50, color: '#fff', rotation: 0 };
+  activeStickers.push(sticker); selectedSticker = sticker; redrawEditorCanvas();
+}
 function addTextSticker() {
   const txt=document.getElementById('text-input').value.trim(); if(!txt){showToast('Type something first!');return;}
-  const ec=document.getElementById('editor-canvas'), rect=ec.getBoundingClientRect();
-  const el=document.createElement('div'); el.className='sticker-el';
-  el.style.cssText=`left:${rect.left+rect.width/2-70}px;top:${rect.top+rect.height/2-20}px;padding:4px 8px;min-width:80px;min-height:38px`;
-  const span=document.createElement('span'); span.textContent=txt;
-  span.style.cssText=`font-family:var(--font-title);font-size:1rem;color:${textColor};text-shadow:0 1px 4px rgba(0,0,0,.8);white-space:nowrap;pointer-events:none`;
-  el.appendChild(span);
-  const del=document.createElement('button'); del.className='del-btn'; del.textContent='✕';
-  del.onclick=()=>removeSticker(el); el.appendChild(del);
-  const scl=document.createElement('div'); scl.className='scl-btn'; scl.textContent='⤡'; el.appendChild(scl);
-  document.body.appendChild(el); activeStickers.push(el);
-  makeDraggable(el); makeScalable(el,span); selectSticker(el);
-  document.getElementById('text-input').value='';
+  const ec=document.getElementById('editor-canvas');
+  const sticker = { type: 'text', content: txt, x: ec.width/2, y: ec.height/2, size: 30, color: textColor, rotation: 0 };
+  activeStickers.push(sticker); selectedSticker = sticker; document.getElementById('text-input').value=''; redrawEditorCanvas();
 }
 function setTextColor(c){textColor=c;}
 function undoLastSticker(){if(!activeStickers.length)return; activeStickers.pop(); selectedSticker=null; redrawEditorCanvas();}
 function clearAllStickers(){activeStickers=[]; selectedSticker=null; currentFrame='none'; document.querySelectorAll('.frame-swatch').forEach(s=>s.classList.remove('active')); document.getElementById('fsw-none').classList.add('active'); redrawEditorCanvas();}
-
-function setTextColor(c){textColor=c;}
-function removeSticker(el){el.remove();activeStickers=activeStickers.filter(s=>s!==el);if(selectedSticker===el)selectedSticker=null;}
-function selectSticker(el){if(selectedSticker)selectedSticker.classList.remove('selected');selectedSticker=el;if(el)el.classList.add('selected');}
-function undoLastSticker(){if(!activeStickers.length)return;const last=activeStickers.pop();last.remove();if(selectedSticker===last)selectedSticker=null;}
-function clearAllStickers(){activeStickers.forEach(s=>s.remove());activeStickers=[];selectedSticker=null;setFrame('none',document.getElementById('fsw-none'));}
-
-document.addEventListener('click',e=>{
-  const inSticker=e.target.closest('.sticker-el');
-  const inCanvas=e.target.id==='editor-canvas';
-  if(!inSticker&&currentScreen==='screen-editor'){if(selectedSticker){selectedSticker.classList.remove('selected');selectedSticker=null;}}
-});
-
-// ── DRAG ─────────────────────────────────────────────
-function makeDraggable(el) {
-  let sx,sy,ox,oy;
-  const dn=e=>{
-    if(e.target.classList.contains('del-btn')||e.target.classList.contains('scl-btn'))return;
-    e.preventDefault(); selectSticker(el);
-    const pt=e.touches?e.touches[0]:e; sx=pt.clientX;sy=pt.clientY;
-    const r=el.getBoundingClientRect(); ox=r.left;oy=r.top;
-    document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
-    document.addEventListener('touchmove',mv,{passive:false}); document.addEventListener('touchend',up);
-  };
-  const mv=e=>{e.preventDefault();const pt=e.touches?e.touches[0]:e;el.style.left=(ox+pt.clientX-sx)+'px';el.style.top=(oy+pt.clientY-sy)+'px';};
-  const up=()=>{document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);document.removeEventListener('touchmove',mv);document.removeEventListener('touchend',up);};
-  el.addEventListener('mousedown',dn); el.addEventListener('touchstart',dn,{passive:false});
-}
-
-// ── SCALE ─────────────────────────────────────────────
-function makeScalable(el,span) {
-  const scl=el.querySelector('.scl-btn');
-  let sx,sy,sw,sh;
-  const dn=e=>{e.preventDefault();e.stopPropagation();const pt=e.touches?e.touches[0]:e;sx=pt.clientX;sy=pt.clientY;sw=el.offsetWidth;sh=el.offsetHeight;
-    document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);
-    document.addEventListener('touchmove',mv,{passive:false});document.addEventListener('touchend',up);};
-  const mv=e=>{e.preventDefault();const pt=e.touches?e.touches[0]:e;const d=Math.max(pt.clientX-sx,pt.clientY-sy);
-    const nw=Math.max(36,sw+d),nh=Math.max(36,sh+d);
-    el.style.width=nw+'px';el.style.height=nh+'px';
-    if(span){const ratio=nw/Math.max(sw,1);span.style.fontSize=Math.max(.5,parseFloat(span.style.fontSize||'3')*ratio)+'rem';}};
-  const up=()=>{document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);document.removeEventListener('touchmove',mv);document.removeEventListener('touchend',up);};
-  scl.addEventListener('mousedown',dn); scl.addEventListener('touchstart',dn,{passive:false});
-}
 
 // ── FRAMES ────────────────────────────────────────────
 function setFrame(id,el) {
