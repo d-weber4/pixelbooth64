@@ -801,7 +801,8 @@ async function saveAndShare() {
   document.getElementById('upload-status').textContent='⏳ Uploading...';
   try {
     const url=await uploadToFirebase(capturedBlob,currentMode);
-    if (typeof qrcode === 'undefined') {
+    const qrLib = window.qrcode || window.QRCode;
+    if (!qrLib) {
       throw new Error('QRCode library failed to load. Check your internet connection or use a local web server.');
     }
     
@@ -809,7 +810,7 @@ async function saveAndShare() {
     document.getElementById('upload-status').textContent='✅ Saved! Scan to download:';
     document.getElementById('share-instructions').textContent='Scan with your phone camera to download your '+(capturedMimeType.includes('video')?'video':'photo')+'!';
     document.getElementById('qr-wrap').style.display='flex';
-    qrcode.toCanvas(document.getElementById('qr-canvas'),url,{width:220,margin:2,color:{dark:'#000',light:'#fff'}});
+    await qrLib.toCanvas(document.getElementById('qr-canvas'), url, {width:220, margin:2, color:{dark:'#000',light:'#fff'}});
   } catch(e) {
     console.error("Upload Error:", e);
     let msg = e.message;
