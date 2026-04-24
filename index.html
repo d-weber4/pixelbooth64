@@ -365,43 +365,14 @@ let editorBaseImage = new Image();
 // ════════════════════════════════════════════════════
 // THEMES
 // ════════════════════════════════════════════════════
-const THEMES = {
-  gaming:   { title:'PixelBooth 64', subtitle:'INSERT COIN TO CONTINUE', attr:null },
-  elegant:  { title:'Le Photomaton', subtitle:'A Soirée to Remember', attr:'elegant' },
-  tropical: { title:'Sunset Snaps', subtitle:'🌺 Strike a Pose 🌺', attr:'tropical' },
-  diner:    { title:"Frankie's Photo Diner", subtitle:'📸 Eat. Smile. Repeat.', attr:'diner' },
-  winter:   { title:'Snowflake Studio', subtitle:'❄ Make a Memory ❄', attr:'winter' },
-};
 
-function setTheme(id, btn) {
-  currentTheme = id;
-  const cfg = THEMES[id];
-  cfg.attr ? document.body.setAttribute('data-theme', cfg.attr) : document.body.removeAttribute('data-theme');
-  document.getElementById('app-title').textContent = cfg.title;
-  document.getElementById('app-subtitle').textContent = cfg.subtitle;
-  document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  document.querySelectorAll('.snowflake').forEach(s => s.remove());
-  if (id === 'winter') initSnow();
-  initPixelBg();
-}
 function initPixelBg() {
   const bg = document.getElementById('pixel-bg'); bg.innerHTML = '';
-  if (currentTheme !== 'gaming') return;
   ['#ff00ff','#00ffff','#ffff00','#ff0088','#00ff88'].forEach(c => {
     for (let j=0;j<3;j++) {
       const el=document.createElement('div'); el.className='pixel-block';
       el.style.cssText=`left:${Math.random()*100}vw;background:${c};animation-duration:${7+Math.random()*9}s;animation-delay:${Math.random()*10}s`;
       bg.appendChild(el);
-    }
-  });
-}
-function initSnow() {
-  '❄❅❆✦*'.split('').forEach(e => {
-    for(let i=0;i<3;i++){
-      const el=document.createElement('div'); el.className='snowflake'; el.textContent=e;
-      el.style.cssText=`left:${Math.random()*100}vw;animation-duration:${5+Math.random()*8}s;animation-delay:${Math.random()*8}s;font-size:${.8+Math.random()*1.2}rem`;
-      document.body.appendChild(el);
     }
   });
 }
