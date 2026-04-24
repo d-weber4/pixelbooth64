@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>PixelBooth 64</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="manifest" href="manifest.json">
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323:wght@400&family=Playfair+Display:wght@400;700&family=Montserrat:wght@300;600&family=Pacifico&family=Quicksand:wght@400;600&family=Cinzel:wght@400;700&family=EB+Garamond&family=Mountains+of+Christmas:wght@400;700&family=Nunito:wght@300;600&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/qrcode@1.4.4/build/qrcode.js"></script>
 <script type="module">
@@ -186,6 +187,7 @@ body::before{content:'';position:fixed;inset:0;background:var(--scanlines);point
   <div class="cam-header">
     <button class="btn btn-back" onclick="confirmBack()">← BACK</button>
     <div class="cam-mode-lbl" id="cam-mode-lbl">PHOTO MODE</div>
+    <button class="btn btn-sm" onclick="cycleFilter()">🌓 FILTER</button>
     <div class="cam-progress" id="cam-progress"></div>
   </div>
   <video id="video-preview" autoplay playsinline muted></video>
@@ -437,6 +439,35 @@ async function uploadToFirebase(blob, mode) {
 }
 
 // ════════════════════════════════════════════════════
+// PWA & AUDIO UTILS
+// ════════════════════════════════════════════════════
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(err => console.log('SW registration failed:', err));
+  });
+}
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function playSound(type) {
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  if (type === 'beep') {
+    osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+  } else if (type === 'shutter') {
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(1000, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+    gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.1);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+  }
+}
+
+// ════════════════════════════════════════════════════
 // NAVIGATION
 // ════════════════════════════════════════════════════
 function showScreen(id) { document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); currentScreen=id; }
@@ -460,6 +491,7 @@ async function startMode(mode) {
   document.getElementById('stop-btn').style.display='none';
   document.getElementById('rec-indicator').classList.remove('visible');
   document.getElementById('cam-hint').textContent=mode==='video'?'TAP TO START RECORDING':'TAP TO TAKE PHOTO';
+  if (audioCtx.state === 'suspended') audioCtx.resume();
   showScreen('screen-camera');
 }
 
@@ -476,7 +508,7 @@ async function handleShutter() {
 async function capturePhoto() {
   isCountingDown=true; document.getElementById('shutter-btn').disabled=true;
   document.getElementById('cam-hint').textContent='GET READY...';
-  await countdown(); flashEffect();
+  await countdown(); flashEffect(); playSound('shutter');
   const dataURL=captureFrame();
   capturedBlob=dataURLToBlob(dataURL); capturedDataURL=dataURL; capturedMimeType='image/jpeg';
   stopCamera(); openEditorWith(dataURL); isCountingDown=false;
@@ -489,7 +521,7 @@ async function captureFilmstrip() {
   for(let i=0;i<4;i++){
     prog.textContent=`PHOTO ${i+1} OF 4`;
     document.getElementById('cam-hint').textContent=`PHOTO ${i+1} — SMILE!`;
-    await countdown(); flashEffect();
+    await countdown(); flashEffect(); playSound('shutter');
     filmstripPhotos.push(captureFrame()); // each frame already correctly oriented
     await delay(350);
   }
@@ -544,7 +576,9 @@ function captureFrame() {
   const canvas=document.getElementById('capture-canvas');
   canvas.width=video.videoWidth||1280; canvas.height=video.videoHeight||720;
   const ctx=canvas.getContext('2d');
-  ctx.save(); ctx.scale(-1,1); ctx.drawImage(video,-canvas.width,0,canvas.width,canvas.height); ctx.restore();
+  ctx.save(); 
+  ctx.filter = video.style.filter;
+  ctx.scale(-1,1); ctx.drawImage(video,-canvas.width,0,canvas.width,canvas.height); ctx.restore();
   return canvas.toDataURL('image/jpeg',0.92);
 }
 
@@ -708,8 +742,14 @@ function redrawEditorCanvas() {
     if(s===selectedSticker){
       ctx.strokeStyle='var(--accent2)'; ctx.setLineDash([5,5]); ctx.lineWidth=2;
       const b=getStickerBounds(s,ctx); ctx.strokeRect(-b.w/2-5,-b.h/2-5,b.w+10,b.h+10);
-      ctx.setLineDash([]); ctx.fillStyle='#c00'; ctx.fillRect(b.w/2+5,-b.h/2-15,20,20); // Del
-      ctx.fillStyle='var(--accent1)'; ctx.fillRect(b.w/2+5,b.h/2+5,20,20); // Scale
+      ctx.setLineDash([]); 
+      ctx.fillStyle='#c00'; ctx.fillRect(b.w/2+5,-b.h/2-15,20,20); // Del
+      ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.beginPath();
+      ctx.moveTo(b.w/2+10,-b.h/2-10); ctx.lineTo(b.w/2+20, -b.h/2);
+      ctx.moveTo(b.w/2+20,-b.h/2-10); ctx.lineTo(b.w/2+10, -b.h/2);
+      ctx.stroke();
+
+      ctx.fillStyle='#0077ff'; ctx.fillRect(b.w/2+5,b.h/2+5,20,20); // Scale
       ctx.fillStyle='#0c0'; ctx.fillRect(-10, -b.h/2 - 35, 20, 20); // Rotate
     }
     ctx.restore();
@@ -863,7 +903,11 @@ function captureGuestbook(){const c=document.getElementById('whiteboard');const 
 async function countdown(){
   const ov=document.getElementById('countdown-overlay'),n=document.getElementById('countdown-number');
   ov.classList.add('visible');
-  for(let i=3;i>=1;i--){n.textContent=i;n.style.animation='none';n.offsetHeight;n.style.animation='countPop .4s ease-out';await delay(900);}
+  for(let i=3;i>=1;i--){
+    n.textContent=i;n.style.animation='none';n.offsetHeight;n.style.animation='countPop .4s ease-out';
+    playSound('beep');
+    await delay(900);
+  }
   ov.classList.remove('visible');
 }
 function flashEffect(){const f=document.getElementById('flash-overlay');f.classList.remove('flash');f.offsetHeight;f.classList.add('flash');}
@@ -880,6 +924,20 @@ function showToast(msg,dur=3200){const t=document.getElementById('toast');t.text
 // ════════════════════════════════════════════════════
 // UTILS
 // ════════════════════════════════════════════════════
+let currentFilterIndex = 0;
+const FILTERS = [
+  { name: 'NORMAL', value: 'none' },
+  { name: 'B&W', value: 'grayscale(1)' },
+  { name: 'SEPIA', value: 'sepia(1)' },
+  { name: 'VIBRANT', value: 'saturate(2) contrast(1.2)' },
+  { name: 'INVERT', value: 'invert(1)' }
+];
+function cycleFilter() {
+  currentFilterIndex = (currentFilterIndex + 1) % FILTERS.length;
+  const f = FILTERS[currentFilterIndex];
+  document.getElementById('video-preview').style.filter = f.value;
+  showToast(`FILTER: ${f.name}`);
+}
 function stopCamera(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}clearInterval(videoTimerInterval);const vid=document.getElementById('video-preview');vid.srcObject=null;document.getElementById('rec-indicator').classList.remove('visible');document.getElementById('shutter-btn').style.display='flex';document.getElementById('shutter-btn').disabled=false;document.getElementById('stop-btn').style.display='none';}
 function cleanupCapture(){if(rawVideoURL)URL.revokeObjectURL(rawVideoURL);capturedBlob=null;capturedDataURL=null;rawVideoURL=null;filmstripPhotos=[];activeStickers=[];selectedSticker=null;stopCamera();}
 function dataURLToBlob(dataURL){const arr=dataURL.split(','),mime=arr[0].match(/:(.*?);/)[1];const b=atob(arr[1]);let n=b.length;const u=new Uint8Array(n);while(n--)u[n]=b.charCodeAt(n);return new Blob([u],{type:mime});}
