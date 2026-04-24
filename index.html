@@ -10,8 +10,8 @@
 <script src="https://unpkg.com/qrcode@1.4.4/build/qrcode.js"></script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
-  window._firebaseModules = { initializeApp, getStorage, ref, uploadBytes, getDownloadURL };
+  import { getStorage, ref, uploadBytes, getDownloadURL, listAll, getMetadata } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+  window._firebaseModules = { initializeApp, getStorage, ref, uploadBytes, getDownloadURL, listAll, getMetadata };
 </script>
 <style>
 /* ── THEMES ─────────────────────────────────────────── */
@@ -25,10 +25,6 @@
   --pixel-border:4px solid var(--border);--glow:0 0 20px var(--accent1),0 0 40px var(--accent2);
   --card-bg:rgba(255,0,255,.07);
 }
-[data-theme="elegant"]{--bg:#0d0d0d;--bg2:#1a1a1a;--surface:#222;--border:#c9a84c;--accent1:#c9a84c;--accent2:#e8d5a3;--accent3:#fff;--text:#f5f0e8;--text2:#b0a090;--btn-bg:#c9a84c;--btn-text:#000;--btn-shadow:#e8d5a3;--font-title:'Cinzel',serif;--font-body:'EB Garamond',serif;--font-size-body:1.2rem;--scanlines:none;--pixel-border:1px solid var(--border);--glow:0 0 20px rgba(201,168,76,.4),0 0 40px rgba(201,168,76,.2);--card-bg:rgba(201,168,76,.06);}
-[data-theme="tropical"]{--bg:#003d2b;--bg2:#004d35;--surface:#005e42;--border:#ff6b35;--accent1:#ff6b35;--accent2:#ffd700;--accent3:#00e5ff;--text:#fff;--text2:#b8f0d5;--btn-bg:#ff6b35;--btn-text:#fff;--btn-shadow:#ffd700;--font-title:'Pacifico',cursive;--font-body:'Quicksand',sans-serif;--font-size-body:1.1rem;--scanlines:none;--pixel-border:3px solid var(--border);--glow:0 0 20px rgba(255,107,53,.5),0 0 40px rgba(255,215,0,.3);--card-bg:rgba(255,107,53,.1);}
-[data-theme="diner"]{--bg:#1a0000;--bg2:#2d0000;--surface:#3d0a0a;--border:#ff3333;--accent1:#ff3333;--accent2:#fff;--accent3:#ffcc00;--text:#fff;--text2:#ffaaaa;--btn-bg:#ff3333;--btn-text:#fff;--btn-shadow:#ffcc00;--font-title:'Pacifico',cursive;--font-body:'Montserrat',sans-serif;--font-size-body:1rem;--scanlines:none;--pixel-border:3px solid var(--border);--glow:0 0 20px rgba(255,51,51,.6),0 0 40px rgba(255,204,0,.3);--card-bg:rgba(255,51,51,.08);}
-[data-theme="winter"]{--bg:#0a1628;--bg2:#0d1f3c;--surface:#162848;--border:#7ec8e3;--accent1:#7ec8e3;--accent2:#fff;--accent3:#b4e1f5;--text:#e8f4fd;--text2:#9ecfdf;--btn-bg:#7ec8e3;--btn-text:#0a1628;--btn-shadow:#fff;--font-title:'Mountains of Christmas',cursive;--font-body:'Nunito',sans-serif;--font-size-body:1.1rem;--scanlines:none;--pixel-border:2px solid var(--border);--glow:0 0 20px rgba(126,200,227,.5),0 0 40px rgba(255,255,255,.2);--card-bg:rgba(126,200,227,.08);}
 
 /* ── BASE ───────────────────────────────────────────── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -49,11 +45,6 @@ body::before{content:'';position:fixed;inset:0;background:var(--scanlines);point
 .mode-icon{font-size:2.1rem;display:block;margin-bottom:5px}
 .mode-label{font-family:var(--font-title);font-size:clamp(.48rem,1.7vw,.68rem);color:var(--accent2);line-height:1.5}
 .mode-desc{font-family:var(--font-body);font-size:clamp(.78rem,2.3vw,1.05rem);color:var(--text2);margin-top:3px}
-.theme-bar{display:flex;gap:9px;align-items:center;flex-wrap:wrap;justify-content:center}
-.theme-label{font-family:var(--font-title);font-size:.48rem;color:var(--text2)}
-.theme-btn{width:30px;height:30px;border-radius:50%;border:2px solid transparent;cursor:pointer;transition:transform .2s,border-color .2s;font-size:1.1rem;display:flex;align-items:center;justify-content:center;background:none}
-.theme-btn:hover{transform:scale(1.2)}
-.theme-btn.active{border-color:var(--accent2);transform:scale(1.15)}
 .pixel-divider{width:100%;max-width:520px;height:2px;background:repeating-linear-gradient(90deg,var(--accent1) 0,var(--accent1) 8px,transparent 8px,transparent 12px);opacity:.4}
 
 /* ── BUTTONS ────────────────────────────────────────── */
@@ -120,6 +111,10 @@ body::before{content:'';position:fixed;inset:0;background:var(--scanlines);point
 .color-swatch.active{border-color:var(--accent2);transform:scale(1.2)}
 .brush-dot{border-radius:50%;background:var(--text);cursor:pointer;transition:transform .15s}
 .brush-dot.active{background:var(--accent1);transform:scale(1.2)}
+/* ── GALLERY ────────────────────────────────────────── */
+#gallery-container{display:grid;grid-template-columns:repeat(auto-fill, minmax(140px, 1fr));gap:12px;width:100%;max-width:800px;padding:10px;overflow-y:auto;flex:1;align-content:start}
+.gallery-item{width:100%;aspect-ratio:1;object-fit:cover;border:var(--pixel-border);border-radius:4px;background:#111;cursor:pointer;transition:transform .15s;}
+.gallery-item:hover{transform:scale(1.05);box-shadow:var(--glow)}
 
 /* ── SHARE ──────────────────────────────────────────── */
 #screen-share{background:var(--bg);gap:16px;overflow-y:auto;justify-content:flex-start;padding-top:26px}
@@ -171,14 +166,7 @@ body::before{content:'';position:fixed;inset:0;background:var(--scanlines);point
     <div class="mode-card" onclick="startMode('filmstrip')"><span class="mode-icon">🎞️</span><div class="mode-label">FILM<br>STRIP</div><div class="mode-desc">4-photo collage</div></div>
     <div class="mode-card" onclick="startMode('video')"><span class="mode-icon">🎬</span><div class="mode-label">VIDEO<br>MSG</div><div class="mode-desc">Up to 1 minute</div></div>
     <div class="mode-card" onclick="startMode('guestbook')"><span class="mode-icon">✍️</span><div class="mode-label">GUEST<br>BOOK</div><div class="mode-desc">Draw a message</div></div>
-  </div>
-  <div class="theme-bar">
-    <span class="theme-label">THEME:</span>
-    <button class="theme-btn active" onclick="setTheme('gaming',this)" title="90s Gaming">🕹️</button>
-    <button class="theme-btn" onclick="setTheme('elegant',this)" title="Elegant">🥂</button>
-    <button class="theme-btn" onclick="setTheme('tropical',this)" title="Tropical">🌴</button>
-    <button class="theme-btn" onclick="setTheme('diner',this)" title="Retro Diner">🍔</button>
-    <button class="theme-btn" onclick="setTheme('winter',this)" title="Winter">❄️</button>
+    <div class="mode-card" style="grid-column: span 2;" onclick="viewGallery()"><span class="mode-icon">🖼️</span><div class="mode-label">SESSION GALLERY</div><div class="mode-desc">View photos from the last 24 hours</div></div>
   </div>
 </div>
 
@@ -264,6 +252,16 @@ body::before{content:'';position:fixed;inset:0;background:var(--scanlines);point
       <button class="btn btn-secondary btn-sm" onclick="clearAllStickers()">🗑 CLEAR</button>
     </div>
   </div>
+</div>
+
+<!-- GALLERY -->
+<div class="screen" id="screen-gallery">
+  <div class="editor-header">
+    <button class="btn btn-back" onclick="showScreen('screen-home')">← BACK</button>
+    <div class="editor-title">🖼️ RECENT CAPTURES</div>
+    <div style="width:68px"></div>
+  </div>
+  <div id="gallery-container"></div>
 </div>
 
 <!-- REVIEW -->
@@ -352,7 +350,7 @@ let capturedBlob = null, capturedDataURL = null, rawVideoURL = null;
 let capturedMimeType = 'image/jpeg';
 let videoTimerInterval = null, videoSeconds = 0, isCountingDown = false;
 let firebaseApp = null, firebaseStorage = null, firebaseConfig = null;
-let currentUploadURL = null, currentTheme = 'gaming';
+let currentUploadURL = null;
 
 // Editor state
 let editorOrigDataURL = null;   // original unedited image for editor canvas
@@ -429,7 +427,7 @@ function initFirebase() {
 }
 async function uploadToFirebase(blob, mode) {
   if(!firebaseStorage) throw new Error('Firebase storage not initialized. Check your configuration.');
-  const{ref,uploadBytes,getDownloadURL}=window._firebaseModules;
+  const{ref,uploadBytes,getDownloadURL,listAll,getMetadata}=window._firebaseModules;
   const today=new Date().toISOString().slice(0,10), ts=Date.now();
   const ext=blob.type.includes('mp4')?'mp4':blob.type.includes('webm')?'webm':'jpg';
   const path=`pixelbooth/${today}/${mode}_${ts}.${ext}`;
@@ -493,6 +491,60 @@ async function startMode(mode) {
   document.getElementById('cam-hint').textContent=mode==='video'?'TAP TO START RECORDING':'TAP TO TAKE PHOTO';
   if (audioCtx.state === 'suspended') audioCtx.resume();
   showScreen('screen-camera');
+}
+
+async function viewGallery() {
+  const container = document.getElementById('gallery-container');
+  container.innerHTML = '<div class="upload-status">Loading captures...</div>';
+  showScreen('screen-gallery');
+
+  if (!firebaseStorage) {
+    container.innerHTML = '<div class="upload-status">Firebase not initialized. Go to FIREBASE SETUP.</div>';
+    return;
+  }
+
+  const { ref, listAll, getDownloadURL, getMetadata } = window._firebaseModules;
+  const now = Date.now();
+  const oneDay = 24 * 60 * 60 * 1000;
+  
+  const getDates = () => {
+    const today = new Date();
+    const yesterday = new Date(now - oneDay);
+    return [today.toISOString().slice(0, 10), yesterday.toISOString().slice(0, 10)];
+  };
+
+  let allItems = [];
+  try {
+    for (const d of getDates()) {
+      const folderRef = ref(firebaseStorage, `pixelbooth/${d}`);
+      try { const res = await listAll(folderRef); allItems = allItems.concat(res.items); } catch (e) {}
+    }
+
+    let files = await Promise.all(allItems.map(async (item) => {
+      try {
+        const meta = await getMetadata(item);
+        const time = new Date(meta.timeCreated).getTime();
+        if (now - time <= oneDay) {
+          const url = await getDownloadURL(item);
+          return { url, time, type: meta.contentType };
+        }
+      } catch(e) {}
+      return null;
+    }));
+
+    files = files.filter(f => f && f.type.startsWith('image/')).sort((a, b) => b.time - a.time);
+    container.innerHTML = '';
+    if (!files.length) { container.innerHTML = '<div class="upload-status">No photos found in the last 24 hours.</div>'; return; }
+
+    files.forEach(file => {
+      const img = document.createElement('img');
+      img.src = file.url; img.className = 'gallery-item';
+      img.onclick = () => { capturedDataURL = file.url; capturedBlob = null; currentMode = 'photo'; showReview(); };
+      container.appendChild(img);
+    });
+  } catch (e) {
+    container.innerHTML = '<div class="upload-status">Failed to load gallery.</div>';
+  }
 }
 
 // ════════════════════════════════════════════════════
