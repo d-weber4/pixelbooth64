@@ -90,13 +90,6 @@ body::before{content:'';position:fixed;inset:0;background:var(--scanlines);point
 .editor-title{font-family:var(--font-title);font-size:clamp(.5rem,1.8vw,.7rem);color:var(--accent1)}
 .editor-canvas-wrap{position:relative;flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#111;min-height:0;width:100%}
 #editor-canvas{display:block;max-width:100%;max-height:100%;touch-action:none}
-/* sticker DOM overlay */
-.sticker-el{position:fixed;cursor:grab;user-select:none;touch-action:none;display:flex;align-items:center;justify-content:center}
-.sticker-el.selected{outline:2px dashed var(--accent2)}
-.sticker-el .del-btn{position:absolute;top:-11px;right:-11px;width:22px;height:22px;border-radius:50%;background:#c00;color:#fff;border:none;font-size:.8rem;cursor:pointer;display:none;align-items:center;justify-content:center;z-index:5}
-.sticker-el.selected .del-btn{display:flex}
-.sticker-el .scl-btn{position:absolute;bottom:-11px;right:-11px;width:22px;height:22px;border-radius:50%;background:var(--accent1);color:#000;border:none;font-size:.9rem;cursor:se-resize;display:none;align-items:center;justify-content:center;z-index:5;touch-action:none}
-.sticker-el.selected .scl-btn{display:flex}
 .editor-toolbar{width:100%;background:var(--bg2);border-top:var(--pixel-border);flex-shrink:0}
 .toolbar-tabs{display:flex;border-bottom:1px solid var(--border)}
 .toolbar-tab{flex:1;padding:9px 4px;font-family:var(--font-title);font-size:clamp(.4rem,1.4vw,.56rem);color:var(--text2);background:none;border:none;cursor:pointer;transition:color .2s,background .2s}
@@ -361,10 +354,13 @@ let currentUploadURL = null, currentTheme = 'gaming';
 
 // Editor state
 let editorOrigDataURL = null;   // original unedited image for editor canvas
-let activeStickers = [];        // DOM sticker elements
+let activeStickers = [];        // Array of {type, content, x, y, size, color}
 let selectedSticker = null;
 let currentFrame = 'none';
 let textColor = '#ffffff';
+let isDragging = false, isResizing = false, isRotating = false;
+let dragStartX, dragStartY, startRotation;
+let editorBaseImage = new Image();
 
 // ════════════════════════════════════════════════════
 // THEMES
@@ -580,21 +576,25 @@ async function buildCollage(photos) {
 // ════════════════════════════════════════════════════
 function openEditorWith(dataURL) {
   editorOrigDataURL=dataURL;
-  activeStickers.forEach(s=>s.remove()); activeStickers=[]; selectedSticker=null;
+  activeStickers=[]; selectedSticker=null;
   currentFrame='none';
   document.querySelectorAll('.frame-swatch').forEach(s=>s.classList.remove('active'));
   document.getElementById('fsw-none').classList.add('active');
 
-  const img=new Image();
-  img.onload=()=>{
-    const wrap=document.getElementById('editor-canvas-wrap');
-    const wW=wrap.clientWidth||window.innerWidth, wH=wrap.clientHeight||(window.innerHeight*0.46);
-    const scale=Math.min(wW/img.naturalWidth, wH/img.naturalHeight, 1);
-    const ec=document.getElementById('editor-canvas');
-    ec.width=Math.round(img.naturalWidth*scale); ec.height=Math.round(img.naturalHeight*scale);
-    ec.getContext('2d').drawImage(img,0,0,ec.width,ec.height);
-  };
-  img.src=dataURL;
+  editorBaseImage.src = dataURL;
+  editorBaseImage.onload = () => { redrawEditorCanvas(); };
+  
+  const ec = document.getElementById('editor-canvas');
+  if (!ec._eventsAttached) {
+    ec.addEventListener('mousedown', handleCanvasPointerDown);
+    ec.addEventListener('mousemove', handleCanvasPointerMove);
+    window.addEventListener('mouseup', handleCanvasPointerUp);
+    ec.addEventListener('touchstart', handleCanvasPointerDown, {passive:false});
+    ec.addEventListener('touchmove', handleCanvasPointerMove, {passive:false});
+    window.addEventListener('touchend', handleCanvasPointerUp);
+    ec._eventsAttached = true;
+  }
+
   switchTab('stickers');
   showScreen('screen-editor');
 }
@@ -638,6 +638,9 @@ function addTextSticker() {
   makeDraggable(el); makeScalable(el,span); selectSticker(el);
   document.getElementById('text-input').value='';
 }
+function setTextColor(c){textColor=c;}
+function undoLastSticker(){if(!activeStickers.length)return; activeStickers.pop(); selectedSticker=null; redrawEditorCanvas();}
+function clearAllStickers(){activeStickers=[]; selectedSticker=null; currentFrame='none'; document.querySelectorAll('.frame-swatch').forEach(s=>s.classList.remove('active')); document.getElementById('fsw-none').classList.add('active'); redrawEditorCanvas();}
 
 function setTextColor(c){textColor=c;}
 function removeSticker(el){el.remove();activeStickers=activeStickers.filter(s=>s!==el);if(selectedSticker===el)selectedSticker=null;}
@@ -690,8 +693,29 @@ function setFrame(id,el) {
   redrawEditorCanvas();
 }
 function redrawEditorCanvas() {
-  const ec=document.getElementById('editor-canvas'), ctx=ec.getContext('2d');
-  const img=new Image(); img.onload=()=>{ctx.clearRect(0,0,ec.width,ec.height);ctx.drawImage(img,0,0,ec.width,ec.height);renderFrame(ctx,ec.width,ec.height);}; img.src=editorOrigDataURL;
+  const ec=document.getElementById('editor-canvas'), ctx=ec.getContext('2d'), wrap=document.getElementById('editor-canvas-wrap');
+  if(!editorBaseImage.complete)return;
+  const wW=wrap.clientWidth||window.innerWidth, wH=wrap.clientHeight||(window.innerHeight*0.46);
+  const scale=Math.min(wW/editorBaseImage.naturalWidth, wH/editorBaseImage.naturalHeight, 1);
+  ec.width=Math.round(editorBaseImage.naturalWidth*scale); ec.height=Math.round(editorBaseImage.naturalHeight*scale);
+  ctx.clearRect(0,0,ec.width,ec.height); ctx.drawImage(editorBaseImage,0,0,ec.width,ec.height);
+  renderFrame(ctx,ec.width,ec.height);
+  activeStickers.forEach(s=>{
+    ctx.save(); ctx.translate(s.x,s.y); ctx.rotate(s.rotation || 0); ctx.textAlign='center'; ctx.textBaseline='middle';
+    if(s.type==='text'){
+      ctx.font=`${s.size}px 'Press Start 2P', monospace`; ctx.strokeStyle='rgba(0,0,0,0.8)'; ctx.lineWidth=Math.max(2,s.size/8);
+      ctx.strokeText(s.content,0,0); ctx.fillStyle=s.color;
+    }else{ ctx.font=`${s.size}px serif`; }
+    ctx.fillText(s.content,0,0);
+    if(s===selectedSticker){
+      ctx.strokeStyle='var(--accent2)'; ctx.setLineDash([5,5]); ctx.lineWidth=2;
+      const b=getStickerBounds(s,ctx); ctx.strokeRect(-b.w/2-5,-b.h/2-5,b.w+10,b.h+10);
+      ctx.setLineDash([]); ctx.fillStyle='#c00'; ctx.fillRect(b.w/2+5,-b.h/2-15,20,20); // Del
+      ctx.fillStyle='var(--accent1)'; ctx.fillRect(b.w/2+5,b.h/2+5,20,20); // Scale
+      ctx.fillStyle='#0c0'; ctx.fillRect(-10, -b.h/2 - 35, 20, 20); // Rotate
+    }
+    ctx.restore();
+  });
 }
 function renderFrame(ctx,W,H) {
   if(currentFrame==='none')return;
@@ -735,43 +759,27 @@ function renderFrame(ctx,W,H) {
 
 // ── FLATTEN ───────────────────────────────────────────
 function flattenEditor() {
-  const ec=document.getElementById('editor-canvas');
-  const ecRect=ec.getBoundingClientRect();
-  const base=new Image();
-  base.onload=()=>{
-    const scaleX=base.naturalWidth/ec.width, scaleY=base.naturalHeight/ec.height;
-    const oc=document.createElement('canvas');
-    oc.width=base.naturalWidth; oc.height=base.naturalHeight;
-    const octx=oc.getContext('2d');
-    // Draw base image (with any frame already painted on ec)
-    octx.drawImage(ec,0,0,oc.width,oc.height);
-    // Flatten stickers
-    const promises=activeStickers.map(sEl=>new Promise(res=>{
-      const sr=sEl.getBoundingClientRect();
-      const x=(sr.left-ecRect.left)*scaleX, y=(sr.top-ecRect.top)*scaleY;
-      const w=sr.width*scaleX, h=sr.height*scaleY;
-      const span=sEl.querySelector('span'); if(!span){res();return;}
-      const content=span.textContent;
-      const isEmoji=/\p{Emoji}/u.test(content)&&[...content].length<=2;
-      const fs=isEmoji?Math.round(h*.88):Math.round(parseFloat(span.style.fontSize||'1')*30*scaleX);
-      octx.save();
-      octx.font=`${fs}px ${isEmoji?'serif':"'Press Start 2P',monospace"}`;
-      octx.textAlign='left'; octx.textBaseline='top';
-      if(!isEmoji){octx.strokeStyle='rgba(0,0,0,.75)';octx.lineWidth=Math.max(2,fs/10);octx.strokeText(content,x+2,y+2);octx.fillStyle=span.style.color||'#fff';}
-      octx.fillText(content,x+2,y+2);
-      octx.restore(); res();
-    }));
-    Promise.all(promises).then(()=>{
-      const finalURL=oc.toDataURL('image/jpeg',0.92);
-      capturedDataURL=finalURL; capturedBlob=dataURLToBlob(finalURL);
-      activeStickers.forEach(s=>s.remove()); activeStickers=[];
-      showReview();
-    });
-  };
-  base.src=editorOrigDataURL;
+  const ec=document.getElementById('editor-canvas'), oc=document.createElement('canvas');
+  oc.width=editorBaseImage.naturalWidth; oc.height=editorBaseImage.naturalHeight;
+  const octx=oc.getContext('2d'), scale=oc.width/ec.width;
+  octx.drawImage(editorBaseImage,0,0);
+  renderFrame(octx,oc.width,oc.height);
+  activeStickers.forEach(s=>{
+    octx.save(); octx.translate(s.x*scale,s.y*scale); octx.rotate(s.rotation || 0); octx.textAlign='center'; octx.textBaseline='middle';
+    const fs=s.size*scale;
+    if(s.type==='text'){
+      octx.font=`${fs}px 'Press Start 2P', monospace`; octx.strokeStyle='rgba(0,0,0,0.8)'; octx.lineWidth=Math.max(2,fs/8);
+      octx.strokeText(s.content,0,0); octx.fillStyle=s.color;
+    }else{ octx.font=`${fs}px serif`; }
+    octx.fillText(s.content,0,0); octx.restore();
+  });
+  const finalURL=oc.toDataURL('image/jpeg',0.92);
+  capturedDataURL=finalURL; capturedBlob=dataURLToBlob(finalURL);
+  activeStickers=[]; selectedSticker=null;
+  showReview();
 }
 
-function skipEditor() { activeStickers.forEach(s=>s.remove()); activeStickers=[]; showReview(); }
+function skipEditor() { activeStickers=[]; selectedSticker=null; showReview(); }
 
 // ════════════════════════════════════════════════════
 // REVIEW
@@ -798,6 +806,7 @@ async function saveAndShare() {
     if (typeof QRCode === 'undefined') {
       throw new Error('QRCode library failed to load. Check your internet connection or use a local web server.');
     }
+    
     currentUploadURL=url;
     document.getElementById('upload-status').textContent='✅ Saved! Scan to download:';
     document.getElementById('share-instructions').textContent='Scan with your phone camera to download your '+(capturedMimeType.includes('video')?'video':'photo')+'!';
@@ -869,7 +878,7 @@ function showToast(msg,dur=3200){const t=document.getElementById('toast');t.text
 // UTILS
 // ════════════════════════════════════════════════════
 function stopCamera(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}clearInterval(videoTimerInterval);const vid=document.getElementById('video-preview');vid.srcObject=null;document.getElementById('rec-indicator').classList.remove('visible');document.getElementById('shutter-btn').style.display='flex';document.getElementById('shutter-btn').disabled=false;document.getElementById('stop-btn').style.display='none';}
-function cleanupCapture(){if(rawVideoURL)URL.revokeObjectURL(rawVideoURL);capturedBlob=null;capturedDataURL=null;rawVideoURL=null;filmstripPhotos=[];activeStickers.forEach(s=>s.remove());activeStickers=[];stopCamera();}
+function cleanupCapture(){if(rawVideoURL)URL.revokeObjectURL(rawVideoURL);capturedBlob=null;capturedDataURL=null;rawVideoURL=null;filmstripPhotos=[];activeStickers=[];selectedSticker=null;stopCamera();}
 function dataURLToBlob(dataURL){const arr=dataURL.split(','),mime=arr[0].match(/:(.*?);/)[1];const b=atob(arr[1]);let n=b.length;const u=new Uint8Array(n);while(n--)u[n]=b.charCodeAt(n);return new Blob([u],{type:mime});}
 function delay(ms){return new Promise(r=>setTimeout(r,ms));}
 document.addEventListener('keydown',e=>{if(e.code==='Space'&&currentScreen==='screen-camera'){e.preventDefault();handleShutter();}if(e.code==='Escape'){closeModal();if(currentScreen==='screen-camera')confirmBack();}});
