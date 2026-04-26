@@ -427,8 +427,14 @@ function initPixelBg() {
     }
   });
 }
-window.addEventListener('load', () => { loadManagementData(); loadFirebaseConfig(); initPixelBg(); resizeWhiteboard(); window.addEventListener('resize', resizeWhiteboard); });
-
+window.addEventListener('load', () => { 
+  loadManagementData(); 
+  loadFirebaseConfig(); 
+  initPixelBg(); 
+  resizeWhiteboard(); 
+  window.addEventListener('resize', resizeWhiteboard); 
+  setTimeout(initFirebase, 500); // Secondary check to ensure modules are ready
+});
 // ════════════════════════════════════════════════════
 // FIREBASE
 // ════════════════════════════════════════════════════
@@ -633,6 +639,8 @@ function openAddEventModal() {
       localStorage.setItem('pb64_codes', JSON.stringify(accessCodes));
       renderEvents();
       showToast('EVENT & ACCESS CODE CREATED');
+    } else {
+      showToast('⚠️ MISSING REQUIRED FIELDS');
     }
   });
 }
@@ -1162,12 +1170,12 @@ function flashEffect(){const f=document.getElementById('flash-overlay');f.classL
 // MODAL & TOAST
 // ════════════════════════════════════════════════════
 let modalCb=null;
-function showModal(title,text,cb){document.getElementById('modal-title').textContent=title;document.getElementById('modal-text').textContent=text;modalCb=cb;document.getElementById('modal-confirm').onclick=()=>{closeModal();if(modalCb)modalCb();};document.getElementById('modal').classList.add('visible');}
 function showModal(title, content, cb) {
   document.getElementById('modal-title').textContent = title;
   const body = document.getElementById('modal-text');
   if (content.includes('<')) body.innerHTML = content; else body.textContent = content;
   modalCb = cb;
+  document.getElementById('modal-confirm').onclick = () => { if(modalCb) modalCb(); closeModal(); };
   document.getElementById('modal').classList.add('visible');
 }
 function closeModal(){document.getElementById('modal').classList.remove('visible'); document.getElementById('modal-text').innerHTML=''; }
