@@ -12,7 +12,25 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js?module";
   import { getStorage, ref, uploadBytes, getDownloadURL, listAll, getMetadata } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js?module";
   import { getFirestore, collection, addDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js?module";
-  window._firebaseModules = { initializeApp, getStorage, ref, uploadBytes, getDownloadURL, listAll, getMetadata, getFirestore, collection, addDoc, doc, updateDoc };
+  
+  // Store helper functions for global access
+  window._firebaseModules = { ref, uploadBytes, getDownloadURL, listAll, getMetadata, collection, addDoc, doc, updateDoc };
+
+  // Move initialization inside the module scope to fix "Service storage is not available"
+  window.performFirebaseInit = function(config) {
+    if (window.firebaseApp) return true;
+    try {
+      console.log("performFirebaseInit: Initializing SDK...");
+      window.firebaseApp = initializeApp(config);
+      window.firebaseStorage = getStorage(window.firebaseApp);
+      window.db = getFirestore(window.firebaseApp);
+      console.log("performFirebaseInit: Services initialized successfully.");
+      return true;
+    } catch (e) {
+      console.error("Firebase Module Init Error:", e);
+      return false;
+    }
+  };
 </script>
 <style>
 /* ── THEMES ─────────────────────────────────────────── */
@@ -451,57 +469,20 @@ function loadFirebaseConfig() {
   initFirebase();
 }
 function initFirebase() {
-  console.log("initFirebase: Function called.");
-
-  if (!firebaseConfig) {
-    console.warn("initFirebase: firebaseConfig is not set yet. Skipping initialization.");
-    return;
-  }
-  console.log("initFirebase: firebaseConfig is available.");
-
-  if (!window._firebaseModules) {
+  if (!firebaseConfig || !window.performFirebaseInit) {
     if (window.location.protocol === 'file:') {
       console.error("Firebase modules failed to load. You must use a local web server (like 'Live Server' in VS Code) to run this app.");
-    } else {
-      console.error("initFirebase: window._firebaseModules is not available. Firebase SDK might not have loaded.");
     }
     return;
   }
-  console.log("initFirebase: window._firebaseModules is available.");
 
-  try { 
-    const { initializeApp, getStorage, getFirestore } = window._firebaseModules;
-    if (!firebaseApp) {
-      console.log("initFirebase: Initializing firebaseApp...");
-      firebaseApp = initializeApp(firebaseConfig);
-      console.log("initFirebase: firebaseApp initialized.");
-
-      console.log("initFirebase: Getting firebaseStorage instance...");
-      firebaseStorage = getStorage(firebaseApp);
-      console.log("initFirebase: firebaseStorage instance obtained.");
-
-      console.log("initFirebase: Getting firestore db instance...");
-      db = getFirestore(firebaseApp);
-      console.log("initFirebase: firestore db instance obtained.");
-
-      console.log("Firebase Service fully initialized.");
-    } else {
-      console.log("initFirebase: firebaseApp already initialized. Ensuring storage and db are set.");
-      if (!firebaseStorage) {
-        firebaseStorage = getStorage(firebaseApp);
-        console.log("initFirebase: firebaseStorage re-obtained.");
-      }
-      if (!db) {
-        db = getFirestore(firebaseApp);
-        console.log("initFirebase: firestore db re-obtained.");
-      }
-      console.log("Firebase Service confirmed initialized.");
-    }
-  } catch(e) { 
-    console.error('Firebase Init Error caught:', e.message, e);
-    firebaseApp = null; // Clear on failure to allow retry
-    firebaseStorage = null;
-    db = null;
+  // Execute initialization within the module context
+  if (window.performFirebaseInit(firebaseConfig)) {
+    // Link global variables for existing code compatibility
+    firebaseApp = window.firebaseApp;
+    firebaseStorage = window.firebaseStorage;
+    db = window.db;
+    console.log("initFirebase: Global instances linked.");
   }
 }
 
