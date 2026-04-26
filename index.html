@@ -9,9 +9,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323:wght@400&family=Playfair+Display:wght@400;700&family=Montserrat:wght@300;600&family=Pacifico&family=Quicksand:wght@400;600&family=Cinzel:wght@400;700&family=EB+Garamond&family=Mountains+of+Christmas:wght@400;700&family=Nunito:wght@300;600&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/qrcode@1.4.4/build/qrcode.js"></script>
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getStorage, ref, uploadBytes, getDownloadURL, listAll, getMetadata } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
-  window._firebaseModules = { initializeApp, getStorage, ref, uploadBytes, getDownloadURL, listAll, getMetadata };
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js?module";
+  import { getStorage, ref, uploadBytes, getDownloadURL, listAll, getMetadata } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js?module";
+  import { getFirestore, collection, addDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js?module";
+  window._firebaseModules = { initializeApp, getStorage, ref, uploadBytes, getDownloadURL, listAll, getMetadata, getFirestore, collection, addDoc, doc, updateDoc };
 </script>
 <style>
 /* ── THEMES ─────────────────────────────────────────── */
@@ -22,10 +23,11 @@
   --btn-bg:#ff00ff;--btn-text:#000;--btn-shadow:#00ffff;
   --font-title:'Press Start 2P',monospace;--font-body:'VT323',monospace;--font-size-body:1.4rem;
   --scanlines:repeating-linear-gradient(0deg,rgba(0,0,0,.08) 0px,rgba(0,0,0,.08) 1px,transparent 1px,transparent 3px);
-  --pixel-border:4px solid var(--border);--glow:0 0 20px var(--accent1),0 0 40px var(--accent2);
+  --pixel-border:4px solid var(--border);--glow:0 0 15px var(--accent1),0 0 30px var(--accent2);
   --card-bg:rgba(255,0,255,.07);
+  --admin-accent:#ffff00;
 }
-
+:root[data-theme='admin'] { --border: var(--admin-accent); --btn-bg: var(--admin-accent); --btn-shadow: #ff00ff; }
 /* ── BASE ───────────────────────────────────────────── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:var(--font-size-body);touch-action:manipulation;-webkit-tap-highlight-color:transparent}
@@ -34,9 +36,13 @@ body::before{content:'';position:fixed;inset:0;background:var(--scanlines);point
 .screen.active{opacity:1;pointer-events:all}
 
 /* ── HOME ───────────────────────────────────────────── */
-#screen-home{background:radial-gradient(ellipse at 50% 30%,var(--bg2) 0%,var(--bg) 70%);gap:22px}
+#screen-home{background:radial-gradient(ellipse at 50% 30%,var(--bg2) 0%,var(--bg) 70%);gap:18px}
 .app-title{font-family:var(--font-title);font-size:clamp(1.1rem,4.5vw,2rem);color:var(--accent1);text-shadow:var(--glow);line-height:1.5;text-align:center;animation:titlePulse 3s ease-in-out infinite}
 @keyframes titlePulse{0%,100%{text-shadow:0 0 20px var(--accent1),0 0 40px var(--accent2)}50%{text-shadow:0 0 40px var(--accent1),0 0 80px var(--accent2),0 0 120px var(--accent1)}}
+.admin-badge{font-family:var(--font-title);font-size:.5rem;color:var(--admin-accent);border:1px solid var(--admin-accent);padding:2px 6px;margin-top:5px;display:none}
+body.is-admin .admin-badge{display:inline-block}
+.admin-btn{position:absolute;top:20px;right:20px;font-size:1.5rem;cursor:pointer;display:none;z-index:100}
+body.is-admin .admin-btn{display:block}
 .app-subtitle{font-family:var(--font-body);font-size:clamp(.85rem,3vw,1.25rem);color:var(--accent2);opacity:.8;text-align:center}
 .mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%;max-width:520px}
 .mode-card{background:var(--card-bg);border:var(--pixel-border);border-radius:4px;padding:16px 10px;text-align:center;cursor:pointer;transition:transform .15s,box-shadow .15s,background .15s;user-select:none}
@@ -154,11 +160,24 @@ body::before{content:'';position:fixed;inset:0;background:var(--scanlines);point
 <body>
 <div class="pixel-bg-deco" id="pixel-bg"></div>
 
+<!-- ACCESS / LOGIN -->
+<div class="screen active" id="screen-access">
+  <div class="app-title">PIXELBOOTH 64</div>
+  <div class="access-box">
+    <div class="form-label">ENTER ACCESS CODE</div>
+    <input type="text" class="access-input" id="access-code-input" placeholder="****" maxlength="12">
+    <button class="btn" onclick="checkAccessCode()">CONTINUE</button>
+  </div>
+  <div class="app-subtitle" style="margin-top:20px">v1.2 ENHANCED EDITION</div>
+</div>
+
 <!-- HOME -->
-<div class="screen active" id="screen-home">
+<div class="screen" id="screen-home">
+  <div class="admin-btn" onclick="showScreen('screen-admin')">⚙️</div>
   <div style="text-align:center">
     <div class="app-title" id="app-title">PixelBooth 64</div>
-    <div class="app-subtitle" id="app-subtitle">INSERT COIN TO CONTINUE</div>
+    <div class="admin-badge">ADMIN MODE</div>
+    <div class="app-subtitle" id="app-subtitle">READY TO CAPTURE</div>
   </div>
   <div class="pixel-divider"></div>
   <div class="mode-grid">
@@ -168,6 +187,34 @@ body::before{content:'';position:fixed;inset:0;background:var(--scanlines);point
     <div class="mode-card" onclick="startMode('guestbook')"><span class="mode-icon">✍️</span><div class="mode-label">GUEST<br>BOOK</div><div class="mode-desc">Draw a message</div></div>
     <div class="mode-card" style="grid-column: span 2;" onclick="viewGallery()"><span class="mode-icon">🖼️</span><div class="mode-label">SESSION GALLERY</div><div class="mode-desc">View photos from the last 24 hours</div></div>
   </div>
+  <button class="btn btn-back btn-sm" style="margin-top:10px" onclick="logout()">LOGOUT</button>
+</div>
+
+<!-- ADMIN PANEL -->
+<div class="screen" id="screen-admin">
+  <div class="editor-header">
+    <button class="btn btn-back" onclick="showScreen('screen-home')">← BACK</button>
+    <div class="editor-title">ADMIN MANAGEMENT</div>
+    <div style="width:60px"></div>
+  </div>
+  <div class="mgmt-container">
+    <div class="admin-tabs">
+      <button class="btn btn-sm" id="btn-mgr-codes" onclick="switchAdminTab('codes')">CODES</button>
+      <button class="btn btn-sm btn-secondary" id="btn-mgr-events" onclick="switchAdminTab('events')">EVENTS</button>
+    </div>
+    
+    <div id="admin-mgr-codes">
+      <button class="btn btn-sm" style="width:100%;margin-bottom:15px" onclick="openAddCodeModal()">+ ADD NEW CODE</button>
+      <div id="codes-list" style="display:flex;flex-direction:column;gap:10px"></div>
+    </div>
+
+    <div id="admin-mgr-events" style="display:none">
+      <button class="btn btn-sm" style="width:100%;margin-bottom:15px" onclick="openAddEventModal()">+ ADD NEW EVENT</button>
+      <div id="events-list" style="display:flex;flex-direction:column;gap:10px"></div>
+    </div>
+  </div>
+  <!-- Hidden area for print assets -->
+  <div id="print-area" style="display:none"></div>
 </div>
 
 <!-- CAMERA -->
@@ -250,6 +297,7 @@ body::before{content:'';position:fixed;inset:0;background:var(--scanlines);point
     <div class="editor-actions">
       <button class="btn btn-secondary btn-sm" onclick="undoLastSticker()">↩ UNDO</button>
       <button class="btn btn-secondary btn-sm" onclick="clearAllStickers()">🗑 CLEAR</button>
+      <button class="btn btn-secondary btn-sm" id="bg-remover-btn" onclick="applyBgRemoval()">👤 CUT-OUT</button>
     </div>
   </div>
 </div>
@@ -274,7 +322,8 @@ body::before{content:'';position:fixed;inset:0;background:var(--scanlines);point
   <div class="review-actions">
     <button class="btn btn-danger" onclick="confirmDelete()">🗑 DELETE</button>
     <button class="btn btn-secondary" onclick="openEditorAgain()">✏️ EDIT</button>
-    <button class="btn btn-secondary" onclick="confirmRetry()">🔄 RETRY</button>
+    <button class="btn btn-secondary" onclick="confirmPrint()">🖨️ PRINT</button>
+    <button class="btn btn-secondary" onclick="confirmRetry()">🔄 RETAKE</button>
     <button class="btn" onclick="saveAndShare()">💾 SAVE &amp; SHARE</button>
   </div>
 </div>
@@ -351,6 +400,8 @@ let capturedMimeType = 'image/jpeg';
 let videoTimerInterval = null, videoSeconds = 0, isCountingDown = false;
 let firebaseApp = null, firebaseStorage = null, firebaseConfig = null;
 let currentUploadURL = null;
+let currentUser = { type: null, code: null, event: null };
+let accessCodes = [], appEvents = [];
 
 // Editor state
 let editorOrigDataURL = null;   // original unedited image for editor canvas
@@ -381,6 +432,7 @@ window.addEventListener('load', () => { loadFirebaseConfig(); initPixelBg(); res
 // ════════════════════════════════════════════════════
 // FIREBASE
 // ════════════════════════════════════════════════════
+let db = null;
 function loadFirebaseConfig() {
   firebaseConfig = {
     apiKey: "AIzaSyBkx3Iwof85fEY45eLLdIzrbBs9tuAhr10",
@@ -400,8 +452,8 @@ async function uploadToFirebase(blob, mode) {
   if(!firebaseStorage) throw new Error('Firebase storage not initialized. Check your configuration.');
   const{ref,uploadBytes,getDownloadURL,listAll,getMetadata}=window._firebaseModules;
   const today=new Date().toISOString().slice(0,10), ts=Date.now();
-  const ext=blob.type.includes('mp4')?'mp4':blob.type.includes('webm')?'webm':'jpg';
-  const path=`pixelbooth/${today}/${mode}_${ts}.${ext}`;
+  const ext=blob.type.includes('video')?'webm':'jpg';
+  const path = currentUser.event ? `pixelbooth/events/${currentUser.event}/${mode}_${ts}.${ext}` : `pixelbooth/${today}/${mode}_${ts}.${ext}`;
   const storageRef=ref(firebaseStorage,path);
   await uploadBytes(storageRef,blob);
   return await getDownloadURL(storageRef);
@@ -442,6 +494,142 @@ function playSound(type) {
 function showScreen(id) { document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); currentScreen=id; }
 
 // ════════════════════════════════════════════════════
+// ACCESS CONTROL & MANAGEMENT
+// ════════════════════════════════════════════════════
+function loadManagementData() {
+  accessCodes = JSON.parse(localStorage.getItem('pb64_codes') || '[]');
+  appEvents = JSON.parse(localStorage.getItem('pb64_events') || '[]');
+  // Add initial admin if missing
+  if(!accessCodes.find(c => c.code === 'dustin44')) {
+    accessCodes.push({ code: 'dustin44', type: 'admin', start: '2024-01-01', end: '2099-12-31' });
+    localStorage.setItem('pb64_codes', JSON.stringify(accessCodes));
+  }
+}
+function checkAccessCode() {
+  const code = document.getElementById('access-code-input').value.trim();
+  if(!code) return;
+  const now = new Date().toISOString().slice(0, 10);
+  const match = accessCodes.find(c => c.code === code && now >= c.start && now <= c.end);
+  
+  if(match) {
+    currentUser = { type: match.type, code: match.code, event: null };
+    const event = appEvents.find(e => e.code === code && now >= e.start && now <= e.end);
+    if(event) currentUser.event = event.name;
+
+    document.body.classList.toggle('is-admin', match.type === 'admin');
+    document.documentElement.setAttribute('data-theme', match.type === 'admin' ? 'admin' : '');
+    showScreen('screen-home');
+    showToast(`WELCOME, ${match.type.toUpperCase()}`);
+  } else {
+    showToast('❌ INVALID OR EXPIRED CODE');
+  }
+}
+function logout() { currentUser = { type: null, code: null }; document.body.classList.remove('is-admin'); document.documentElement.setAttribute('data-theme', ''); showScreen('screen-access'); }
+
+function switchAdminTab(tab) {
+  document.getElementById('admin-mgr-codes').style.display = tab === 'codes' ? 'block' : 'none';
+  document.getElementById('admin-mgr-events').style.display = tab === 'events' ? 'block' : 'none';
+  document.getElementById('btn-mgr-codes').classList.toggle('btn-secondary', tab !== 'codes');
+  document.getElementById('btn-mgr-events').classList.toggle('btn-secondary', tab !== 'events');
+  if(tab === 'codes') renderCodes(); else renderEvents();
+}
+
+function renderCodes() {
+  const list = document.getElementById('codes-list'); list.innerHTML = '';
+  accessCodes.forEach((c, i) => {
+    const el = document.createElement('div'); el.className = 'mgmt-card';
+    el.innerHTML = `<div class="mgmt-info"><div class="mgmt-name">${c.code} (${c.type})</div><div class="mgmt-meta">${c.start} to ${c.end}</div></div>
+      <button class="btn btn-sm btn-danger" style="min-width:unset" onclick="deleteCode(${i})">X</button>`;
+    list.appendChild(el);
+  });
+}
+function deleteCode(i) { accessCodes.splice(i, 1); localStorage.setItem('pb64_codes', JSON.stringify(accessCodes)); renderCodes(); }
+
+function renderEvents() {
+  const list = document.getElementById('events-list'); list.innerHTML = '';
+  appEvents.forEach((e, i) => {
+    const el = document.createElement('div'); el.className = 'mgmt-card';
+    el.innerHTML = `<div class="mgmt-info"><div class="mgmt-name">${e.name}</div><div class="mgmt-meta">Host: ${e.host} | Code: ${e.code}</div></div>
+      <button class="btn btn-sm btn-danger" style="min-width:unset" onclick="deleteEvent(${i})">X</button>`;
+    list.appendChild(el);
+  });
+}
+function deleteEvent(i) { appEvents.splice(i, 1); localStorage.setItem('pb64_events', JSON.stringify(appEvents)); renderEvents(); }
+
+function openAddCodeModal() {
+  const html = `<div class="config-inputs">
+    <input id="new-code" class="config-input" placeholder="CODE">
+    <select id="new-code-type" class="config-input"><option value="user">USER</option><option value="admin">ADMIN</option></select>
+    <div class="form-group"><div class="form-label">START DATE</div><input type="date" id="new-code-start" class="config-input"></div>
+    <div class="form-group"><div class="form-label">END DATE</div><input type="date" id="new-code-end" class="config-input"></div>
+  </div>`;
+  showModal('ADD CODE', html, () => {
+    const code = document.getElementById('new-code').value.trim();
+    const type = document.getElementById('new-code-type').value;
+    const start = document.getElementById('new-code-start').value;
+    const end = document.getElementById('new-code-end').value;
+    if(code && start && end) {
+      accessCodes.push({ code, type, start, end });
+      localStorage.setItem('pb64_codes', JSON.stringify(accessCodes));
+      renderCodes();
+    }
+  });
+}
+function openAddEventModal() {
+  const html = `<div class="config-inputs">
+    <input id="ev-name" class="config-input" placeholder="EVENT NAME">
+    <input id="ev-host" class="config-input" placeholder="HOST NAME">
+    <input id="ev-email" class="config-input" placeholder="HOST EMAIL">
+    <input id="ev-code" class="config-input" placeholder="ACCESS CODE">
+    <div class="form-group"><div class="form-label">START DATE</div><input type="date" id="ev-start" class="config-input"></div>
+    <div class="form-group"><div class="form-label">END DATE</div><input type="date" id="ev-end" class="config-input"></div>
+  </div>`;
+  showModal('NEW EVENT', html, () => {
+    const name = document.getElementById('ev-name').value.trim();
+    const host = document.getElementById('ev-host').value.trim();
+    const email = document.getElementById('ev-email').value.trim();
+    const code = document.getElementById('ev-code').value.trim();
+    const start = document.getElementById('ev-start').value;
+    const end = document.getElementById('ev-end').value;
+    if(name && code && start && end) {
+      appEvents.push({ name, host, email, code, start, end });
+      accessCodes.push({ code, type: 'user', start, end });
+      localStorage.setItem('pb64_events', JSON.stringify(appEvents));
+      localStorage.setItem('pb64_codes', JSON.stringify(accessCodes));
+      renderEvents();
+      showToast('EVENT & ACCESS CODE CREATED');
+    }
+  });
+}
+
+// ════════════════════════════════════════════════════
+// PRINT & EXTRA TOOLS
+// ════════════════════════════════════════════════════
+function confirmPrint() {
+  const area = document.getElementById('print-area'); area.innerHTML = '';
+  const img = document.createElement('img'); img.src = capturedDataURL;
+  area.appendChild(img);
+  window.print();
+}
+
+function applyBgRemoval() {
+  // Simplified pixel-art "Background Remover" 
+  // It uses a threshold filter to create a silhouette effect or clear dark backgrounds
+  const ec = document.getElementById('editor-canvas'), ctx = ec.getContext('2d');
+  const imgData = ctx.getImageData(0,0,ec.width,ec.height);
+  const data = imgData.data;
+  
+  // Find a dominant color (rough heuristic for background) or just remove darks
+  for(let i=0; i<data.length; i+=4) {
+    const r=data[i], g=data[i+1], b=data[i+2];
+    // If it's very dark (shadows/bg), make it transparent
+    if(r < 40 && g < 40 && b < 40) data[i+3] = 0;
+  }
+  ctx.putImageData(imgData, 0, 0);
+  showToast("BACKGROUND REMOVED (THRESHOLD)");
+}
+
+// ════════════════════════════════════════════════════
 // MODE ENTRY
 // ════════════════════════════════════════════════════
 async function startMode(mode) {
@@ -449,7 +637,7 @@ async function startMode(mode) {
   if(mode==='guestbook'){clearWhiteboard();showScreen('screen-guestbook');return;}
   try {
     if(stream) stream.getTracks().forEach(t=>t.stop());
-    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:1280},height:{ideal:720}},audio:mode==='video'});
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:960},height:{ideal:720}},audio:mode==='video'});
     const vid=document.getElementById('video-preview'); vid.srcObject=stream; await vid.play();
   } catch(e){showToast('Camera access denied. Allow camera permissions and retry.');return;}
   const lbl={photo:'PHOTO MODE',filmstrip:'FILMSTRIP MODE',video:'VIDEO MESSAGE'};
@@ -595,12 +783,12 @@ function finishVideo(){
 function captureFrame() {
   // Preview is CSS-mirrored (transform:scaleX(-1)) so the video stream is correct orientation
   // We flip horizontally on canvas so the saved image reads correctly (un-mirror)
-  const video=document.getElementById('video-preview');
-  const canvas=document.getElementById('capture-canvas');
-  canvas.width=video.videoWidth||1280; canvas.height=video.videoHeight||720;
-  const ctx=canvas.getContext('2d');
+  const video = document.getElementById('video-preview');
+  const canvas = document.getElementById('capture-canvas');
+  canvas.width = video.videoWidth || 960; canvas.height = video.videoHeight || 720;
+  const ctx = canvas.getContext('2d');
   ctx.save(); 
-  ctx.filter = video.style.filter;
+  if(video.style.filter && video.style.filter !== 'none') ctx.filter = video.style.filter;
   ctx.scale(-1,1); ctx.drawImage(video,-canvas.width,0,canvas.width,canvas.height); ctx.restore();
   return canvas.toDataURL('image/jpeg',0.92);
 }
@@ -898,7 +1086,7 @@ function downloadLocal() {
 let drawCtx,isDrawing=false,lastX=0,lastY=0,drawColor='#000',drawSize=4,isErasing=false;
 function resizeWhiteboard() {
   const canvas=document.getElementById('whiteboard');
-  const maxW=Math.min(window.innerWidth-40,700), maxH=Math.min(window.innerHeight*.40,340);
+  const maxW=Math.min(window.innerWidth-40,700), maxH=Math.min(window.innerHeight*.65,540);
   let saved=null; if(drawCtx)saved=drawCtx.getImageData(0,0,canvas.width,canvas.height);
   canvas.width=maxW; canvas.height=maxH;
   drawCtx=canvas.getContext('2d'); drawCtx.fillStyle='#fff'; drawCtx.fillRect(0,0,maxW,maxH);
@@ -940,7 +1128,14 @@ function flashEffect(){const f=document.getElementById('flash-overlay');f.classL
 // ════════════════════════════════════════════════════
 let modalCb=null;
 function showModal(title,text,cb){document.getElementById('modal-title').textContent=title;document.getElementById('modal-text').textContent=text;modalCb=cb;document.getElementById('modal-confirm').onclick=()=>{closeModal();if(modalCb)modalCb();};document.getElementById('modal').classList.add('visible');}
-function closeModal(){document.getElementById('modal').classList.remove('visible');}
+function showModal(title, content, cb) {
+  document.getElementById('modal-title').textContent = title;
+  const body = document.getElementById('modal-text');
+  if (content.includes('<')) body.innerHTML = content; else body.textContent = content;
+  modalCb = cb;
+  document.getElementById('modal').classList.add('visible');
+}
+function closeModal(){document.getElementById('modal').classList.remove('visible'); document.getElementById('modal-text').innerHTML=''; }
 let toastT=null;
 function showToast(msg,dur=3200){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('visible');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('visible'),dur);}
 
