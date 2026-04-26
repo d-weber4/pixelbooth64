@@ -427,7 +427,7 @@ function initPixelBg() {
     }
   });
 }
-window.addEventListener('load', () => { loadFirebaseConfig(); initPixelBg(); resizeWhiteboard(); window.addEventListener('resize', resizeWhiteboard); });
+window.addEventListener('load', () => { loadManagementData(); loadFirebaseConfig(); initPixelBg(); resizeWhiteboard(); window.addEventListener('resize', resizeWhiteboard); });
 
 // ════════════════════════════════════════════════════
 // FIREBASE
@@ -446,8 +446,15 @@ function loadFirebaseConfig() {
 }
 function initFirebase() {
   if(!firebaseConfig) return;
-  try { const{initializeApp,getStorage}=window._firebaseModules; try{firebaseApp=initializeApp(firebaseConfig,'pixelbooth');}catch(e){} firebaseStorage=getStorage(firebaseApp); } catch(e){console.warn('Firebase:',e.message);}
+  try { const { initializeApp, getStorage, getFirestore } = window._firebaseModules; 
+    try { 
+      firebaseApp = initializeApp(firebaseConfig); 
+    } catch(e) {} 
+    firebaseStorage = getStorage(firebaseApp);
+    db = getFirestore(firebaseApp);
+  } catch(e) { console.warn('Firebase Init Warning:', e.message); }
 }
+
 async function uploadToFirebase(blob, mode) {
   if(!firebaseStorage) throw new Error('Firebase storage not initialized. Check your configuration.');
   const{ref,uploadBytes,getDownloadURL,listAll,getMetadata}=window._firebaseModules;
@@ -549,11 +556,39 @@ function renderEvents() {
   const list = document.getElementById('events-list'); list.innerHTML = '';
   appEvents.forEach((e, i) => {
     const el = document.createElement('div'); el.className = 'mgmt-card';
-    el.innerHTML = `<div class="mgmt-info"><div class="mgmt-name">${e.name}</div><div class="mgmt-meta">Host: ${e.host} | Code: ${e.code}</div></div>
-      <button class="btn btn-sm btn-danger" style="min-width:unset" onclick="deleteEvent(${i})">X</button>`;
+    el.innerHTML = `
+      <div class="mgmt-info">
+        <div class="mgmt-name">${e.name}</div>
+        <div class="mgmt-meta">Host: ${e.host} | Code: ${e.code}</div>
+      </div>
+      <div style="display:flex; gap:5px;">
+        <button class="btn btn-sm" onclick="finishEvent(${i})">🏁 FINISH</button>
+        <button class="btn btn-sm btn-danger" style="min-width:unset" onclick="deleteEvent(${i})">X</button>
+      </div>`;
     list.appendChild(el);
   });
 }
+async function finishEvent(index) {
+  const event = appEvents[index];
+  const { collection, addDoc } = window._firebaseModules;
+  if (!db) { showToast("DATABASE NOT READY"); return; }
+  
+  showToast("SENDING GALLERY TO HOST...");
+  try {
+    await addDoc(collection(db, "mail"), {
+      to: event.email,
+      message: {
+        subject: `Your PixelBooth 64 Gallery: ${event.name}`,
+        html: `<h1>Thanks for hosting!</h1><p>The event is finished. View your photos here:</p><a href="${window.location.origin}/?gallery=${encodeURIComponent(event.name)}">View Gallery</a>`,
+      }
+    });
+    showToast("EMAIL SENT TO HOST!");
+  } catch (e) {
+    console.error(e);
+    showToast("ERROR SENDING EMAIL");
+  }
+}
+
 function deleteEvent(i) { appEvents.splice(i, 1); localStorage.setItem('pb64_events', JSON.stringify(appEvents)); renderEvents(); }
 
 function openAddCodeModal() {
