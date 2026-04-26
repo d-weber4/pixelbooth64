@@ -441,46 +441,96 @@ window.addEventListener('load', () => {
 let db = null;
 function loadFirebaseConfig() {
   firebaseConfig = {
-    apiKey: "AIzaSyBkx3Iwof85fEY45eLLdIzrbBs9tuAhr10",
-    authDomain: "photobooth64-11d1c.firebaseapp.com",
-    projectId: "photobooth64-11d1c",
-    storageBucket: "photobooth64-11d1c.firebasestorage.app",
-    messagingSenderId: "123245203678",
-    appId: "1:123245203678:web:34ba21d618a9193f0f724f"
+    apiKey: "AIzaSyBkx3Iwof85fEY45eLLdIzrbBs9tuAhr10", // Replace with your actual API Key
+    authDomain: "photobooth64-11d1c.firebaseapp.com", // Replace with your actual Auth Domain
+    projectId: "photobooth64-11d1c", // Replace with your actual Project ID
+    storageBucket: "photobooth64-11d1c.firebasestorage.app", // Replace with your actual Storage Bucket
+    messagingSenderId: "123245203678", // Replace with your actual Messaging Sender ID
+    appId: "1:123245203678:web:34ba21d618a9193f0f724f" // Replace with your actual App ID
   };
   initFirebase();
 }
 function initFirebase() {
-if (!firebaseConfig) return;
+  console.log("initFirebase: Function called.");
+
+  if (!firebaseConfig) {
+    console.warn("initFirebase: firebaseConfig is not set yet. Skipping initialization.");
+    return;
+  }
+  console.log("initFirebase: firebaseConfig is available.");
+
   if (!window._firebaseModules) {
-    // If running via file:// protocol, modules will not load due to security restrictions
     if (window.location.protocol === 'file:') {
       console.error("Firebase modules failed to load. You must use a local web server (like 'Live Server' in VS Code) to run this app.");
+    } else {
+      console.error("initFirebase: window._firebaseModules is not available. Firebase SDK might not have loaded.");
     }
     return;
   }
+  console.log("initFirebase: window._firebaseModules is available.");
+
   try { 
     const { initializeApp, getStorage, getFirestore } = window._firebaseModules;
     if (!firebaseApp) {
+      console.log("initFirebase: Initializing firebaseApp...");
       firebaseApp = initializeApp(firebaseConfig);
+      console.log("initFirebase: firebaseApp initialized.");
+
+      console.log("initFirebase: Getting firebaseStorage instance...");
       firebaseStorage = getStorage(firebaseApp);
+      console.log("initFirebase: firebaseStorage instance obtained.");
+
+      console.log("initFirebase: Getting firestore db instance...");
       db = getFirestore(firebaseApp);
-      console.log("Firebase Service initialized");
+      console.log("initFirebase: firestore db instance obtained.");
+
+      console.log("Firebase Service fully initialized.");
+    } else {
+      console.log("initFirebase: firebaseApp already initialized. Ensuring storage and db are set.");
+      if (!firebaseStorage) {
+        firebaseStorage = getStorage(firebaseApp);
+        console.log("initFirebase: firebaseStorage re-obtained.");
+      }
+      if (!db) {
+        db = getFirestore(firebaseApp);
+        console.log("initFirebase: firestore db re-obtained.");
+      }
+      console.log("Firebase Service confirmed initialized.");
     }
   } catch(e) { 
-    console.error('Firebase Init Error:', e.message); 
-  }   
+    console.error('Firebase Init Error caught:', e.message, e);
+    firebaseApp = null; // Clear on failure to allow retry
+    firebaseStorage = null;
+    db = null;
+  }
 }
 
 async function uploadToFirebase(blob, mode) {
-  if(!firebaseStorage) throw new Error('Firebase storage not initialized. Check your configuration.');
+  console.log("uploadToFirebase: Attempting to upload.");
+  if (!firebaseStorage) {
+    console.error('uploadToFirebase: Firebase storage is null. Re-attempting initialization and throwing error.');
+    initFirebase(); // Try to re-initialize just in case
+    throw new Error('Firebase storage not initialized. Check your configuration.');
+  }
+  console.log("uploadToFirebase: firebaseStorage is available.");
+
   const{ref,uploadBytes,getDownloadURL,listAll,getMetadata}=window._firebaseModules;
   const today=new Date().toISOString().slice(0,10), ts=Date.now();
   const ext=blob.type.includes('video')?'webm':'jpg';
   const path = currentUser.event ? `pixelbooth/events/${currentUser.event}/${mode}_${ts}.${ext}` : `pixelbooth/${today}/${mode}_${ts}.${ext}`;
   const storageRef=ref(firebaseStorage,path);
-  await uploadBytes(storageRef,blob);
-  return await getDownloadURL(storageRef);
+  
+  console.log(`uploadToFirebase: Uploading to path: ${path}`);
+  try {
+    await uploadBytes(storageRef,blob);
+    console.log("uploadToFirebase: Upload successful.");
+    const downloadURL = await getDownloadURL(storageRef);
+    console.log(`uploadToFirebase: Download URL obtained: ${downloadURL}`);
+    return downloadURL;
+  } catch (error) {
+    console.error("uploadToFirebase: Error during upload or getting download URL:", error);
+    throw error; // Re-throw to be caught by the calling function
+  }
 }
 
 // ════════════════════════════════════════════════════
