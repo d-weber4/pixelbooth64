@@ -451,9 +451,16 @@ function loadFirebaseConfig() {
   initFirebase();
 }
 function initFirebase() {
- if(!firebaseConfig || !window._firebaseModules) return;
+if (!firebaseConfig) return;
+  if (!window._firebaseModules) {
+    // If running via file:// protocol, modules will not load due to security restrictions
+    if (window.location.protocol === 'file:') {
+      console.error("Firebase modules failed to load. You must use a local web server (like 'Live Server' in VS Code) to run this app.");
+    }
+    return;
+  }
   try { 
- const { initializeApp, getStorage, getFirestore } = window._firebaseModules;
+    const { initializeApp, getStorage, getFirestore } = window._firebaseModules;
     if (!firebaseApp) {
       firebaseApp = initializeApp(firebaseConfig);
       firebaseStorage = getStorage(firebaseApp);
