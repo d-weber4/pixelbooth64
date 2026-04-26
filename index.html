@@ -451,14 +451,18 @@ function loadFirebaseConfig() {
   initFirebase();
 }
 function initFirebase() {
-  if(!firebaseConfig) return;
-  try { const { initializeApp, getStorage, getFirestore } = window._firebaseModules; 
-    try { 
-      firebaseApp = initializeApp(firebaseConfig); 
-    } catch(e) {} 
-    firebaseStorage = getStorage(firebaseApp);
-    db = getFirestore(firebaseApp);
-  } catch(e) { console.warn('Firebase Init Warning:', e.message); }
+ if(!firebaseConfig || !window._firebaseModules) return;
+  try { 
+ const { initializeApp, getStorage, getFirestore } = window._firebaseModules;
+    if (!firebaseApp) {
+      firebaseApp = initializeApp(firebaseConfig);
+      firebaseStorage = getStorage(firebaseApp);
+      db = getFirestore(firebaseApp);
+      console.log("Firebase Service initialized");
+    }
+  } catch(e) { 
+    console.error('Firebase Init Error:', e.message); 
+  }   
 }
 
 async function uploadToFirebase(blob, mode) {
@@ -1090,6 +1094,7 @@ function confirmBack(){showModal('GO BACK?','Leave this mode and return to main 
 
 async function saveAndShare() {
   if(!firebaseConfig){showToast('⚙ Set up Firebase first (tap ⚙ FIREBASE SETUP on main menu)');return;}
+  if(!firebaseStorage) initFirebase(); 
   showScreen('screen-share');
   document.getElementById('qr-wrap').style.display='none';
   document.getElementById('upload-status').textContent='⏳ Uploading...';
