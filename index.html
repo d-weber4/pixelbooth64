@@ -98,7 +98,7 @@ body::before{content:'';position:fixed;inset:0;background:var(--scanlines);point
 #screen-review{background:var(--bg);gap:16px;overflow-y:auto;justify-content:flex-start;padding-top:26px}
 .review-title{font-family:var(--font-title);font-size:clamp(.62rem,2.4vw,.9rem);color:var(--accent1);text-shadow:var(--glow);text-align:center}
 #review-media-wrap{width:100%;max-width:560px;border:var(--pixel-border);box-shadow:var(--glow);border-radius:4px;overflow:hidden;background:#000}
-#review-photo{width:100%;display:block}
+#review-photo{width:100%;display:block;image-rendering:pixelated;object-fit:contain}
 #review-video{width:100%;display:block;max-height:48vh}
 .review-actions{display:flex;flex-wrap:wrap;gap:9px;justify-content:center;width:100%;max-width:560px;padding-bottom:20px}
 
@@ -113,7 +113,7 @@ body::before{content:'';position:fixed;inset:0;background:var(--scanlines);point
 .brush-dot.active{background:var(--accent1);transform:scale(1.2)}
 /* ── GALLERY ────────────────────────────────────────── */
 #gallery-container{display:grid;grid-template-columns:repeat(auto-fill, minmax(140px, 1fr));gap:12px;width:100%;max-width:800px;padding:10px;overflow-y:auto;flex:1;align-content:start}
-.gallery-item{width:100%;aspect-ratio:1;object-fit:cover;border:var(--pixel-border);border-radius:4px;background:#111;cursor:pointer;transition:transform .15s;}
+.gallery-item{width:100%;aspect-ratio:auto;object-fit:contain;border:var(--pixel-border);border-radius:4px;background:#111;cursor:pointer;transition:transform .15s;max-height:200px}
 .gallery-item:hover{transform:scale(1.05);box-shadow:var(--glow)}
 
 /* ── SHARE ──────────────────────────────────────────── */
@@ -230,6 +230,8 @@ body::before{content:'';position:fixed;inset:0;background:var(--scanlines);point
       <div class="frame-swatch" id="fsw-tropical" style="background:linear-gradient(135deg,#003d2b,#f63);border:3px solid #ffd700" onclick="setFrame('tropical',this)">TROPIC</div>
       <div class="frame-swatch" id="fsw-polaroid" style="background:#f5f0e8;border:2px solid #ccc;color:#333" onclick="setFrame('polaroid',this)">POLAR</div>
       <div class="frame-swatch" id="fsw-pixel" style="background:repeating-linear-gradient(45deg,#ff0,#f0f 10px,#0ff 10px,#0ff 20px);border:3px solid #fff" onclick="setFrame('pixel',this)">PIXEL</div>
+      <div class="frame-swatch" id="fsw-glitch" style="background:#000;border:3px double #0ff;color:#f0f" onclick="setFrame('glitch',this)">GLITCH</div>
+      <div class="frame-swatch" id="fsw-8bit" style="background:#222;border:4px ridge #555;color:#0f0" onclick="setFrame('8bit',this)">8-BIT</div>
     </div>
     <!-- TEXT -->
     <div class="toolbar-panel" id="panel-text" style="flex-direction:column;align-items:flex-start;gap:7px;min-height:88px">
@@ -274,6 +276,7 @@ body::before{content:'';position:fixed;inset:0;background:var(--scanlines);point
   <div class="review-actions">
     <button class="btn btn-danger" onclick="confirmDelete()">🗑 DELETE</button>
     <button class="btn btn-secondary" onclick="openEditorAgain()">✏️ EDIT</button>
+    <button class="btn btn-secondary" id="review-bg-remover" onclick="applyBgRemovalReview()">👤 NO BG</button>
     <button class="btn btn-secondary" onclick="confirmRetry()">🔄 RETRY</button>
     <button class="btn" onclick="saveAndShare()">💾 SAVE &amp; SHARE</button>
   </div>
@@ -815,6 +818,13 @@ function renderFrame(ctx,W,H) {
     const sz=Math.max(t,8);const cols=['#ff00ff','#00ffff','#ffff00','#ff0088'];
     for(let x=0;x<W;x+=sz){ctx.fillStyle=cols[Math.floor(x/sz)%4];ctx.fillRect(x,0,sz,sz);ctx.fillRect(x,H-sz,sz,sz);}
     for(let y=sz;y<H-sz;y+=sz){ctx.fillStyle=cols[Math.floor(y/sz)%4];ctx.fillRect(0,y,sz,sz);ctx.fillRect(W-sz,y,sz,sz);}
+  } else if(currentFrame==='glitch'){
+    ctx.strokeStyle='#0ff';ctx.lineWidth=t;ctx.strokeRect(t,t,W-t*2,H-t*2);
+    ctx.strokeStyle='#f0f';ctx.lineWidth=2;ctx.strokeRect(t+5,t-3,W-t*2,H-t*2);
+  } else if(currentFrame==='8bit'){
+    const sz=Math.max(t,8);const cols=['#ff00ff','#00ffff','#ffff00','#ff0088'];
+    for(let x=0;x<W;x+=sz){ctx.fillStyle=cols[Math.floor(x/sz)%4];ctx.fillRect(x,0,sz,sz);ctx.fillRect(x,H-sz,sz,sz);}
+    for(let y=sz;y<H-sz;y+=sz){ctx.fillStyle=cols[Math.floor(y/sz)%4];ctx.fillRect(0,y,sz,sz);ctx.fillRect(W-sz,y,sz,sz);}
   }
 }
 
@@ -898,7 +908,7 @@ function downloadLocal() {
 let drawCtx,isDrawing=false,lastX=0,lastY=0,drawColor='#000',drawSize=4,isErasing=false;
 function resizeWhiteboard() {
   const canvas=document.getElementById('whiteboard');
-  const maxW=Math.min(window.innerWidth-40,700), maxH=Math.min(window.innerHeight*.40,340);
+  const maxW=Math.min(window.innerWidth-30,900), maxH=Math.min(window.innerHeight*.70,600);
   let saved=null; if(drawCtx)saved=drawCtx.getImageData(0,0,canvas.width,canvas.height);
   canvas.width=maxW; canvas.height=maxH;
   drawCtx=canvas.getContext('2d'); drawCtx.fillStyle='#fff'; drawCtx.fillRect(0,0,maxW,maxH);
@@ -953,7 +963,9 @@ const FILTERS = [
   { name: 'B&W', value: 'grayscale(1)' },
   { name: 'SEPIA', value: 'sepia(1)' },
   { name: 'VIBRANT', value: 'saturate(2) contrast(1.2)' },
-  { name: 'INVERT', value: 'invert(1)' }
+  { name: 'INVERT', value: 'invert(1)' },
+  { name: 'RETRO', value: 'sepia(0.5) contrast(1.5) brightness(0.9)' },
+  { name: 'CYBER', value: 'hue-rotate(90deg) saturate(2)' }
 ];
 function cycleFilter() {
   currentFilterIndex = (currentFilterIndex + 1) % FILTERS.length;
