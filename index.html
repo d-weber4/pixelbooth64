@@ -92,6 +92,7 @@ body::before{content:'';position:fixed;inset:0;background:var(--scanlines);point
 .sticker-pick:hover,.sticker-pick:active{transform:scale(1.35)}
 .frame-swatch{width:52px;height:52px;border-radius:4px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.5rem;font-family:var(--font-title);color:#fff;transition:transform .15s,outline .15s;outline:2px solid transparent;text-align:center;line-height:1.2}
 .frame-swatch:hover,.frame-swatch.active{transform:scale(1.1);outline:3px solid var(--accent2)}
+.font-btn.active{outline:2px solid var(--accent2);background:rgba(255,255,255,0.2)}
 .editor-actions{display:flex;gap:8px;justify-content:center;padding:8px 10px;border-top:1px solid rgba(255,255,255,.1);flex-wrap:wrap}
 
 /* ── REVIEW ─────────────────────────────────────────── */
@@ -249,9 +250,13 @@ body::before{content:'';position:fixed;inset:0;background:var(--scanlines);point
         <button class="btn btn-sm" style="min-width:unset;padding:5px 9px;background:#0ef;color:#000" onclick="setTextColor('#0ef')">💙</button>
       </div>
       <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:2px">
-        <button class="btn btn-sm" style="min-width:unset;padding:4px 8px;font-family:'Press Start 2P';font-size:7px" onclick="setFont(\"'Press Start 2P', monospace\")">PIXEL</button>
-        <button class="btn btn-sm" style="min-width:unset;padding:4px 8px;font-family:'Nunito';font-size:10px" onclick="setFont(\"'Nunito', sans-serif\")">SIMPLE</button>
-        <button class="btn btn-sm" style="min-width:unset;padding:4px 8px;font-family:'Mountains of Christmas';font-size:10px" onclick="setFont(\"'Mountains of Christmas', cursive\")">PRINT</button>
+        <button class="btn btn-sm font-btn active" id="fnt-pixel" style="min-width:unset;padding:4px 8px;font-family:'Press Start 2P';font-size:7px" onclick="setFont(&quot;'Press Start 2P', monospace&quot;, this)">PIXEL</button>
+        <button class="btn btn-sm font-btn" id="fnt-simple" style="min-width:unset;padding:4px 8px;font-family:'Nunito';font-size:10px" onclick="setFont(&quot;'Nunito', sans-serif&quot;, this)">SIMPLE</button>
+        <button class="btn btn-sm font-btn" id="fnt-print" style="min-width:unset;padding:4px 8px;font-family:'Mountains of Christmas';font-size:10px" onclick="setFont(&quot;'Mountains of Christmas', cursive&quot;, this)">PRINT</button>
+      </div>
+      <div style="display:flex;gap:7px;align-items:center;width:100%;margin-top:2px">
+        <span style="font-family:var(--font-title);font-size:.4rem;color:var(--text2)">SIZE:</span>
+        <input id="text-size-slider" type="range" min="10" max="200" value="30" style="flex:1;cursor:pointer" oninput="setFontSize(this.value)">
       </div>
     </div>
     <div class="editor-actions">
@@ -741,6 +746,7 @@ function handleCanvasPointerDown(e) {
   }
   if(hit) {
     selectedSticker = hit; isDragging = true; dragStartX = pt.x - hit.x; dragStartY = pt.y - hit.y;
+    if(hit.type === 'text') document.getElementById('text-size-slider').value = hit.size;
     redrawEditorCanvas();
   } else if(selectedSticker) { selectedSticker = null; redrawEditorCanvas(); }
 }
@@ -751,6 +757,7 @@ function handleCanvasPointerMove(e) {
   else if(isResizing) {
     const dx = pt.x - selectedSticker.x, dy = pt.y - selectedSticker.y;
     selectedSticker.size = Math.max(10, Math.sqrt(dx*dx + dy*dy) * 1.2);
+    if(selectedSticker.type === 'text') document.getElementById('text-size-slider').value = selectedSticker.size;
   }
   else if(isRotating) {
     selectedSticker.rotation = Math.atan2(pt.y - selectedSticker.y, pt.x - selectedSticker.x) - startRotation;
@@ -768,10 +775,24 @@ function addTextSticker() {
   const txt=document.getElementById('text-input').value.trim(); if(!txt){showToast('Type something first!');return;}
   const ec=document.getElementById('editor-canvas');
   const sticker = { type: 'text', content: txt, x: ec.width/2, y: ec.height/2, size: 30, color: textColor, rotation: 0, font: selectedFont };
-  activeStickers.push(sticker); selectedSticker = sticker; document.getElementById('text-input').value=''; redrawEditorCanvas();
+  activeStickers.push(sticker); selectedSticker = sticker; 
+  document.getElementById('text-input').value=''; 
+  document.getElementById('text-size-slider').value = 30;
+  redrawEditorCanvas();
 }
-function setTextColor(c){textColor=c;}
-function setFont(f){selectedFont=f;showToast("Font changed");}
+function setTextColor(c){
+  textColor=c;
+  if(selectedSticker && selectedSticker.type === 'text'){ selectedSticker.color = c; redrawEditorCanvas(); }
+}
+function setFont(f, el){
+  selectedFont = f;
+  document.querySelectorAll('.font-btn').forEach(b => b.classList.remove('active'));
+  if(el) el.classList.add('active');
+  if(selectedSticker && selectedSticker.type === 'text'){ selectedSticker.font = f; redrawEditorCanvas(); }
+}
+function setFontSize(v){
+  if(selectedSticker && selectedSticker.type === 'text'){ selectedSticker.size = parseInt(v); redrawEditorCanvas(); }
+}
 function undoLastSticker(){if(!activeStickers.length)return; activeStickers.pop(); selectedSticker=null; redrawEditorCanvas();}
 function clearAllStickers(){activeStickers=[]; selectedSticker=null; currentFrame='none'; document.querySelectorAll('.frame-swatch').forEach(s=>s.classList.remove('active')); document.getElementById('fsw-none').classList.add('active'); redrawEditorCanvas();}
 
