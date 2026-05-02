@@ -98,13 +98,6 @@ body::before{content:'';position:fixed;inset:0;background:var(--scanlines);point
 #screen-review{background:var(--bg);gap:16px;overflow-y:auto;justify-content:flex-start;padding-top:26px}
 .review-title{font-family:var(--font-title);font-size:clamp(.62rem,2.4vw,.9rem);color:var(--accent1);text-shadow:var(--glow);text-align:center}
 #review-media-wrap{width:100%;max-width:560px;border:var(--pixel-border);box-shadow:var(--glow);border-radius:4px;overflow:hidden;background:#000;display:flex;align-items:center;justify-content:center;min-height:300px}
-/* Checkerboard pattern to show transparency */
-.transparency-bg {
-  background-image: linear-gradient(45deg, #222 25%, transparent 25%), linear-gradient(-45deg, #222 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #222 75%), linear-gradient(-45deg, transparent 75%, #222 75%);
-  background-size: 20px 20px;
-  background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
-  background-color: #111 !important;
-}
 #review-photo{width:100%;height:auto;display:block;image-rendering:pixelated;object-fit:contain;max-height:70vh}
 #review-video{width:100%;display:block;max-height:48vh}
 .review-actions{display:flex;flex-wrap:wrap;gap:9px;justify-content:center;width:100%;max-width:560px;padding-bottom:20px}
@@ -255,6 +248,11 @@ body::before{content:'';position:fixed;inset:0;background:var(--scanlines);point
         <button class="btn btn-sm" style="min-width:unset;padding:5px 9px;background:#fc0;color:#000" onclick="setTextColor('#fc0')">💛</button>
         <button class="btn btn-sm" style="min-width:unset;padding:5px 9px;background:#0ef;color:#000" onclick="setTextColor('#0ef')">💙</button>
       </div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:2px">
+        <button class="btn btn-sm" style="min-width:unset;padding:4px 8px;font-family:'Press Start 2P';font-size:7px" onclick="setFont(\"'Press Start 2P', monospace\")">PIXEL</button>
+        <button class="btn btn-sm" style="min-width:unset;padding:4px 8px;font-family:'Nunito';font-size:10px" onclick="setFont(\"'Nunito', sans-serif\")">SIMPLE</button>
+        <button class="btn btn-sm" style="min-width:unset;padding:4px 8px;font-family:'Mountains of Christmas';font-size:10px" onclick="setFont(\"'Mountains of Christmas', cursive\")">PRINT</button>
+      </div>
     </div>
     <div class="editor-actions">
       <button class="btn btn-secondary btn-sm" onclick="undoLastSticker()">↩ UNDO</button>
@@ -283,7 +281,6 @@ body::before{content:'';position:fixed;inset:0;background:var(--scanlines);point
   <div class="review-actions">
     <button class="btn btn-danger" onclick="confirmDelete()">🗑 DELETE</button>
     <button class="btn btn-secondary" onclick="openEditorAgain()">✏️ EDIT</button>
-    <button class="btn btn-secondary" id="review-bg-remover" onclick="applyBgRemovalReview()">👤 NO BG</button>
     <button class="btn btn-secondary" onclick="confirmRetry()">🔄 RETRY</button>
     <button class="btn" onclick="saveAndShare()">💾 SAVE &amp; SHARE</button>
   </div>
@@ -368,6 +365,7 @@ let activeStickers = [];        // Array of {type, content, x, y, size, color}
 let selectedSticker = null;
 let currentFrame = 'none';
 let textColor = '#ffffff';
+let selectedFont = "'Press Start 2P', monospace";
 let isDragging = false, isResizing = false, isRotating = false;
 let dragStartX, dragStartY, startRotation;
 let editorBaseImage = new Image();
@@ -769,10 +767,11 @@ function addSticker(emoji) {
 function addTextSticker() {
   const txt=document.getElementById('text-input').value.trim(); if(!txt){showToast('Type something first!');return;}
   const ec=document.getElementById('editor-canvas');
-  const sticker = { type: 'text', content: txt, x: ec.width/2, y: ec.height/2, size: 30, color: textColor, rotation: 0 };
+  const sticker = { type: 'text', content: txt, x: ec.width/2, y: ec.height/2, size: 30, color: textColor, rotation: 0, font: selectedFont };
   activeStickers.push(sticker); selectedSticker = sticker; document.getElementById('text-input').value=''; redrawEditorCanvas();
 }
 function setTextColor(c){textColor=c;}
+function setFont(f){selectedFont=f;showToast("Font changed");}
 function undoLastSticker(){if(!activeStickers.length)return; activeStickers.pop(); selectedSticker=null; redrawEditorCanvas();}
 function clearAllStickers(){activeStickers=[]; selectedSticker=null; currentFrame='none'; document.querySelectorAll('.frame-swatch').forEach(s=>s.classList.remove('active')); document.getElementById('fsw-none').classList.add('active'); redrawEditorCanvas();}
 
@@ -794,7 +793,7 @@ function redrawEditorCanvas() {
   activeStickers.forEach(s=>{
     ctx.save(); ctx.translate(s.x,s.y); ctx.rotate(s.rotation || 0); ctx.textAlign='center'; ctx.textBaseline='middle';
     if(s.type==='text'){
-      ctx.font=`${s.size}px 'Press Start 2P', monospace`; ctx.strokeStyle='rgba(0,0,0,0.8)'; ctx.lineWidth=Math.max(2,s.size/8);
+      ctx.font=`${s.size}px ${s.font || "'Press Start 2P', monospace"}`; ctx.strokeStyle='rgba(0,0,0,0.8)'; ctx.lineWidth=Math.max(2,s.size/8);
       ctx.strokeText(s.content,0,0); ctx.fillStyle=s.color;
     }else{ ctx.font=`${s.size}px serif`; }
     ctx.fillText(s.content,0,0);
@@ -872,13 +871,17 @@ function flattenEditor() {
     octx.save(); octx.translate(s.x*scale,s.y*scale); octx.rotate(s.rotation || 0); octx.textAlign='center'; octx.textBaseline='middle';
     const fs=s.size*scale;
     if(s.type==='text'){
-      octx.font=`${fs}px 'Press Start 2P', monospace`; octx.strokeStyle='rgba(0,0,0,0.8)'; octx.lineWidth=Math.max(2,fs/8);
+      octx.font=`${fs}px ${s.font || "'Press Start 2P', monospace"}`; octx.strokeStyle='rgba(0,0,0,0.8)'; octx.lineWidth=Math.max(2,fs/8);
       octx.strokeText(s.content,0,0); octx.fillStyle=s.color;
     }else{ octx.font=`${fs}px serif`; }
     octx.fillText(s.content,0,0); octx.restore();
   });
   const finalURL=oc.toDataURL('image/png');
-  capturedDataURL=finalURL; capturedBlob=dataURLToBlob(finalURL);
+  capturedDataURL=finalURL;
+  if(currentMode !== 'video') {
+    capturedBlob=dataURLToBlob(finalURL);
+    capturedMimeType='image/png';
+  }
   activeStickers=[]; selectedSticker=null;
   showReview();
 }
