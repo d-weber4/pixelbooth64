@@ -97,8 +97,15 @@ body::before{content:'';position:fixed;inset:0;background:var(--scanlines);point
 /* ── REVIEW ─────────────────────────────────────────── */
 #screen-review{background:var(--bg);gap:16px;overflow-y:auto;justify-content:flex-start;padding-top:26px}
 .review-title{font-family:var(--font-title);font-size:clamp(.62rem,2.4vw,.9rem);color:var(--accent1);text-shadow:var(--glow);text-align:center}
-#review-media-wrap{width:100%;max-width:560px;border:var(--pixel-border);box-shadow:var(--glow);border-radius:4px;overflow:hidden;background:#000}
-#review-photo{width:100%;display:block;image-rendering:pixelated;object-fit:contain}
+#review-media-wrap{width:100%;max-width:560px;border:var(--pixel-border);box-shadow:var(--glow);border-radius:4px;overflow:hidden;background:#000;display:flex;align-items:center;justify-content:center;min-height:300px}
+/* Checkerboard pattern to show transparency */
+.transparency-bg {
+  background-image: linear-gradient(45deg, #222 25%, transparent 25%), linear-gradient(-45deg, #222 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #222 75%), linear-gradient(-45deg, transparent 75%, #222 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+  background-color: #111 !important;
+}
+#review-photo{width:100%;height:auto;display:block;image-rendering:pixelated;object-fit:contain;max-height:70vh}
 #review-video{width:100%;display:block;max-height:48vh}
 .review-actions{display:flex;flex-wrap:wrap;gap:9px;justify-content:center;width:100%;max-width:560px;padding-bottom:20px}
 
@@ -113,7 +120,7 @@ body::before{content:'';position:fixed;inset:0;background:var(--scanlines);point
 .brush-dot.active{background:var(--accent1);transform:scale(1.2)}
 /* ── GALLERY ────────────────────────────────────────── */
 #gallery-container{display:grid;grid-template-columns:repeat(auto-fill, minmax(140px, 1fr));gap:12px;width:100%;max-width:800px;padding:10px;overflow-y:auto;flex:1;align-content:start}
-.gallery-item{width:100%;aspect-ratio:auto;object-fit:contain;border:var(--pixel-border);border-radius:4px;background:#111;cursor:pointer;transition:transform .15s;max-height:200px}
+.gallery-item{width:100%;height:auto;aspect-ratio:auto;object-fit:contain;border:var(--pixel-border);border-radius:4px;background:#111;cursor:pointer;transition:transform .15s;max-height:180px}
 .gallery-item:hover{transform:scale(1.05);box-shadow:var(--glow)}
 
 /* ── SHARE ──────────────────────────────────────────── */
@@ -562,10 +569,35 @@ async function startVideoRecording() {
   document.getElementById('cam-hint').textContent='RECORDING STARTS SOON...';
   await countdown();
   recordedChunks=[];
+  
+  // To bake in filters/mirroring, we record a canvas stream instead of the raw camera stream
+  const video = document.getElementById('video-preview');
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth || 1280; canvas.height = video.videoHeight || 720;
+  const ctx = canvas.getContext('2d');
+  
+  const streamToRecord = canvas.captureStream(30); // 30 FPS
+  // Add audio tracks from the original camera stream
+  stream.getAudioTracks().forEach(track => streamToRecord.addTrack(track));
+
   const mimeType=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':MediaRecorder.isTypeSupported('video/webm')?'video/webm':'video/mp4';
-  mediaRecorder=new MediaRecorder(stream,{mimeType});
+  mediaRecorder=new MediaRecorder(streamToRecord,{mimeType});
   mediaRecorder.ondataavailable=e=>{if(e.data.size>0)recordedChunks.push(e.data);};
   mediaRecorder.onstop=finishVideo; mediaRecorder.start(100);
+
+  // Drawing loop to bake filters into the recording
+  function recordFrame() {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      ctx.filter = video.style.filter;
+      ctx.save();
+      ctx.scale(-1, 1);
+      ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+      ctx.restore();
+      requestAnimationFrame(recordFrame);
+    }
+  }
+  recordFrame();
+
   document.getElementById('shutter-btn').style.display='none';
   document.getElementById('stop-btn').style.display='flex';
   document.getElementById('rec-indicator').classList.add('visible');
@@ -605,7 +637,7 @@ function captureFrame() {
   ctx.save(); 
   ctx.filter = video.style.filter;
   ctx.scale(-1,1); ctx.drawImage(video,-canvas.width,0,canvas.width,canvas.height); ctx.restore();
-  return canvas.toDataURL('image/jpeg',0.92);
+  return canvas.toDataURL('image/png'); // Using PNG to support potential transparency later
 }
 
 async function buildCollage(photos) {
@@ -645,6 +677,7 @@ function openEditorWith(dataURL) {
   editorBaseImage.onload = () => { redrawEditorCanvas(); };
   
   const ec = document.getElementById('editor-canvas');
+  ec.style.imageRendering = 'pixelated';
   if (!ec._eventsAttached) {
     ec.addEventListener('mousedown', handleCanvasPointerDown);
     ec.addEventListener('mousemove', handleCanvasPointerMove);
@@ -844,7 +877,7 @@ function flattenEditor() {
     }else{ octx.font=`${fs}px serif`; }
     octx.fillText(s.content,0,0); octx.restore();
   });
-  const finalURL=oc.toDataURL('image/jpeg',0.92);
+  const finalURL=oc.toDataURL('image/png');
   capturedDataURL=finalURL; capturedBlob=dataURLToBlob(finalURL);
   activeStickers=[]; selectedSticker=null;
   showReview();
