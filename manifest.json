@@ -1,18 +1,1 @@
-{
-  "short_name": "PixelBooth 64",
-  "name": "PixelBooth 64 Photobooth",
-  "icons": [
-    {
-      "src": "favicon.ico",
-      "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/x-icon"
-    }
-  ],
-  "start_url": ".",
-  "display": "standalone",
-  "theme_color": "#0a0a1a",
-  "background_color": "#0a0a1a",
-  "orientation": "portrait",
-  "description": "Retro-style photobooth with stickers and filters.",
-  "categories": ["lifestyle", "entertainment"]
-}
+{"background_color":"#0d0518","categories":["lifestyle","entertainment"],"description":"Retro Halloween photobooth with stickers, frames and filters.","display":"standalone","icons":[{"purpose":"any","sizes":"any","src":"icon.svg","type":"image/svg+xml"}],"name":"PixelBooth 64 🎃 Halloween Photobooth","orientation":"portrait","short_name":"PixelBooth 64","start_url":".","theme_color":"#1e0a33"}

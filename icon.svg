@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#1e0a33"/>
+  <rect x="14" y="14" width="484" height="484" rx="86" fill="none" stroke="#ff7518" stroke-width="10"/>
+  <!-- stem -->
+  <path d="M248 108 C 246 78, 268 58, 296 52 C 290 78, 282 92, 276 112 Z" fill="#3f7d0c"/>
+  <!-- pumpkin body -->
+  <ellipse cx="256" cy="300" rx="158" ry="138" fill="#ff7518"/>
+  <ellipse cx="256" cy="300" rx="104" ry="136" fill="none" stroke="#d95d06" stroke-width="10" opacity="0.55"/>
+  <ellipse cx="256" cy="300" rx="52" ry="134" fill="none" stroke="#d95d06" stroke-width="10" opacity="0.45"/>
+  <!-- carved face -->
+  <path d="M168 252 L 214 202 L 224 258 Z" fill="#431f04"/>
+  <path d="M288 258 L 298 202 L 344 252 Z" fill="#431f04"/>
+  <path d="M240 292 L 256 268 L 272 292 Z" fill="#431f04"/>
+  <path d="M160 330 L 196 356 L 224 332 L 256 360 L 288 332 L 316 356 L 352 330 L 338 386 C 290 408, 222 408, 174 386 Z" fill="#431f04"/>
+  <path d="M176 338 L 198 356 L 222 340 L 254 364 L 286 340 L 310 356 L 334 338 L 326 374 C 288 392, 224 392, 186 374 Z" fill="#ffd23f" opacity="0.9"/>
+  <!-- little bat -->
+  <path d="M392 108 c 10 -12, 26 -12, 34 0 c 4 -8, 14 -10, 20 -4 c -6 2, -8 6, -8 12 c -10 -8, -28 -8, -38 0 c 0 -6, -2 -10, -8 -12 c 6 -6, 16 -4, 20 4 Z" fill="#b565ff"/>
+</svg>
